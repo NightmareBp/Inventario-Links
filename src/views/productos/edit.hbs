@@ -1,0 +1,398 @@
+<div class="container p-4">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card">
+                <div class="card-header text-center">
+                    <h3>Producto</h3>
+                </div>
+                <div class="card-body">
+                    <form action="/inventario/edit/{{producto.id_producto}}" method="POST" id="editarform"
+                        enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label class="form-label">Nombre del Producto</label>
+                            <input type="text" value="{{producto.nombre_producto}}" class="form-control" name="nombre"
+                                autofocus required>
+                        </div>
+                        <div class="input-group mb-3">
+                            <input type="hidden" name="imagenantigua" value="{{producto.imagen}}">
+                            <div class="col-lg-4 text-center"><label class="form-label">Imagen</label><br><img
+                                    src="{{producto.imagen}}" alt="{{producto.nombre_producto}}" width="125"></div>
+                            <div class="col-lg-8"><label class="form-label">Cambiar Imagen</label>
+                                <input type="file" accept="image/*" class="form-control" name="imagen"><br>
+                                {{#ifvalue producto.imagen value="/img/predeterminadoproducto.png"}}{{else}}
+                                <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal"
+                                    data-bs-target="#ModalEliminarImagen">
+                                    Eliminar Imagen
+                                </button>
+                                <div class="modal fade" id="ModalEliminarImagen" aria-labelledby="exampleModalLabel"
+                                    aria-hidden="true">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h1 class="modal-title fs-5" id="exampleModalLabel">Eliminar Imagen
+                                                </h1>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                                    aria-label="Close"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                ¿Estás seguro que desea continuar con esta acción?
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-primary"
+                                                    data-bs-dismiss="modal">Atrás</button>
+                                                <a class="btn btn-outline-danger"
+                                                    href="/inventario/eliminarimagen/{{producto.id_producto}}">Continuar</a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {{/ifvalue}}
+                            </div>
+                        </div>
+                        <div class="input-group mb-3">
+                            <span class="input-group-text">Cantidad Límite</span>
+                            <input type="number" value="{{producto.cantidad_limite}}" class="form-control"
+                                name="cantidadlimite" required>
+                        </div>
+                        <div class="input-group mb-3">
+                            <span class="input-group-text">Tiempo Antes de la Notificación de Vencimiento</span>
+                            <span class="input-group-text">Años</span>
+                            <input type="number" {{#ifvalue anos value=0}}{{else}} value="{{anos}}" {{/ifvalue}}
+                                class="form-control" name="anos" aria-label="Server">
+                            <span class="input-group-text">Meses</span>
+                            <input type="number" {{#ifvalue meses value=0}}{{else}} value="{{meses}}" {{/ifvalue}}
+                                class="form-control" name="meses" aria-label="Server">
+                            <span class="input-group-text">Días</span>
+                            <input type="number" {{#ifvalue dias value=0}}{{else}} value="{{dias}}" {{/ifvalue}}
+                                class="form-control" name="dias" aria-label="Server">
+                        </div>
+                        <div class="card-body border mb-3">
+                            <h5 class="mb-3" style="text-align: center;">Precios de Compra y Venta</h5><form></form>
+                            {{#if precios}}
+                            <table class="table table-striped-columns text-center">
+                                <thead>
+                                    <tr class="table-primary">
+                                        <th scope="col">Unidad</th>
+                                        <th scope="col">Precio de Venta</th>
+                                        <th scope="col">Precio de Compra</th>
+                                        <th scope="col">Editar</th>
+                                        <th scope="col">Eliminar</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {{#each precios}}
+                                    <form></form>
+                                    <tr>
+                                        <td>{{nombre_unidad}}</td>
+                                        {{#ifvalue precio_venta value=0}}<td>-</td>
+                                        {{else}}<td>{{precio_venta}}</td>{{/ifvalue}}
+                                        {{#ifvalue precio_compra value=0}}<td>-</td>
+                                        {{else}}<td>{{precio_compra}}</td>{{/ifvalue}}
+                                        <td><button type="button" class="btn btn-outline-primary" data-bs-toggle="modal"
+                                                data-bs-target="#ModalEditar{{id_precio}}"
+                                                data-bs-whatever="@mdo">Editar</button>
+                                        </td>
+                                        <td><button type="button" class="btn btn-outline-danger" data-bs-toggle="modal"
+                                                data-bs-target="#ModalEliminar{{id_precio}}">
+                                                Eliminar
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <div class="modal fade" id="ModalEditar{{id_precio}}"
+                                        aria-labelledby="exampleModalLabel" aria-hidden="true"
+                                        data-id-unidad="{{id_unidad}}" data-id-precio="{{id_precio}}">
+                                        <div class="modal-dialog">
+                                            <div class="modal-content">
+                                                <form action="/inventario/editarprecios/{{id_precio}}" method="post"
+                                                    id="formularioprecio{{id_precio}}">
+                                                    <div class="modal-header">
+                                                        <h1 class="modal-title fs-5" id="exampleModalLabel">Editar
+                                                            Precios
+                                                        </h1>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                                            aria-label="Close"></button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        <div class="mb-3">
+                                                            <label class="col-form-label">Unidad</label>
+                                                            <select id="unidadselect{{id_precio}}" name="unidad"
+                                                                class="form-select form-select-sm"
+                                                                aria-label=".form-select-sm example" required>
+                                                                <option value="">Seleccione la Unidad</option>
+                                                                {{#each ../unidades}}
+                                                                <option value="{{id_unidad}}">{{nombre}} ({{cantidad}})
+                                                                </option>
+                                                                {{else}}
+                                                                <option value="1">No hay nada para mostrar</option>
+                                                                {{/each}}
+                                                            </select>
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <a href="/inventario/unidades"
+                                                                class="btn btn-outline-primary">Editar Unidades</a>
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <label class="col-form-label">Precio de
+                                                                Venta</label>
+                                                            <input type="text" {{#ifvalue precio_venta
+                                                                value=0}}{{else}} value="{{precio_venta}}" {{/ifvalue}}
+                                                                class="form-control" name="precio_venta">
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <label class="col-form-label">Precio de
+                                                                Compra</label>
+                                                            <input type="text" {{#ifvalue precio_compra
+                                                                value=0}}{{else}} value="{{precio_compra}}" {{/ifvalue}}
+                                                                class="form-control" name="precio_compra">
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button form="formularioprecio{{id_precio}}" type="submit"
+                                                            class="btn btn-outline-success">Guardar Cambios</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="modal fade" id="ModalEliminar{{id_precio}}"
+                                        aria-labelledby="exampleModalLabel" aria-hidden="true">
+                                        <div class="modal-dialog">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h1 class="modal-title fs-5" id="exampleModalLabel">Eliminar Precios
+                                                    </h1>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                                        aria-label="Close"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    ¿Estás seguro que desea continuar con esta acción?
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-primary"
+                                                        data-bs-dismiss="modal">Atrás</button>
+                                                    <a class="btn btn-outline-danger"
+                                                        href="/inventario/eliminarprecio/{{id_precio}}">Continuar</a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {{/each}}
+                                </tbody>
+                            </table>
+                            {{else}}
+                            <h5 class="text-center text-danger">No hay precios para mostrar</h5><br>
+                            {{/if}}
+                            <button type="button" class="btn btn-outline-success" data-bs-toggle="modal"
+                                data-bs-target="#ModalAñadir" data-bs-whatever="@mdo">Añadir</button>
+                            <div class="modal fade" id="ModalAñadir" aria-labelledby="exampleModalLabel"
+                                aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <form action="/inventario/anadirprecios/{{producto.id_producto}}" method="post"
+                                            id="formularioanadirprecio">
+                                            <div class="modal-header">
+                                                <h1 class="modal-title fs-5" id="exampleModalLabel">Añadir
+                                                    Precios
+                                                </h1>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                                    aria-label="Close"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <div class="mb-3" aria-label=".form-select-sm example" required>
+                                                    <label class="col-form-label">Unidad</label>
+                                                    <select id="unidadselect" name="unidad"
+                                                        class="form-select form-select-sm">
+                                                        <option value="">Seleccione la Unidad</option>
+                                                        {{#each unidades}}
+                                                        <option value="{{id_unidad}}">{{nombre}} ({{cantidad}})
+                                                        </option>
+                                                        {{else}}
+                                                        <option value="1">No hay nada para mostrar</option>
+                                                        {{/each}}
+                                                    </select>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <a href="/inventario/unidades"
+                                                        class="btn btn-outline-primary">Editar Unidades</a>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="col-form-label">Precio de
+                                                        Venta</label>
+                                                    <input type="text" class="form-control" name="precio_venta">
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="col-form-label">Precio de
+                                                        Compra</label>
+                                                    <input type="text" class="form-control" name="precio_compra">
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button form="formularioanadirprecio" type="submit"
+                                                    class="btn btn-outline-success">Guardar Cambios</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body border mb-3">
+                            <h5 class="mb-3" style="text-align: center;">Inventario</h5>
+                            {{#if fechasvencimiento}}
+                            <table class="table table-striped-columns text-center">
+                                <thead>
+                                    <tr class="table-primary">
+                                        <th scope="col">Inventario</th>
+                                        <th scope="col">Fecha de Vencimiento</th>
+                                        <th scope="col">Editar</th>
+                                        <th scope="col">Eliminar</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {{#each fechasvencimiento}}
+                                    <tr>
+                                        <td>{{inventario}}</td>
+                                        {{#ifvalue fecha_vencimientoFormateada value='01/01/1970'}}<td>-</td>
+                                        {{else}}<td>{{fecha_vencimientoFormateada}}</td>{{/ifvalue}}
+                                        <td><button type="button" class="btn btn-outline-primary" data-bs-toggle="modal"
+                                                data-bs-target="#ModalEditarI{{id_fechavencimiento}}"
+                                                data-bs-whatever="@mdo">Editar</button>
+                                        </td>
+                                        <td><button type="button" class="btn btn-outline-danger" data-bs-toggle="modal"
+                                                data-bs-target="#ModalEliminarI{{id_fechavencimiento}}">
+                                                Eliminar
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <div class="modal fade" id="ModalEditarI{{id_fechavencimiento}}"
+                                        aria-labelledby="exampleModalLabel" aria-hidden="true">
+                                        <div class="modal-dialog">
+                                            <div class="modal-content">
+                                                <form action="/inventario/editarinventarios/{{id_fechavencimiento}}"
+                                                    method="post" id="formularioinventario{{id_fechavencimiento}}">
+                                                    <div class="modal-header">
+                                                        <h1 class="modal-title fs-5" id="exampleModalLabel">Editar
+                                                            Inventario
+                                                        </h1>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                                            aria-label="Close"></button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        <div class="mb-3">
+                                                            <label class="col-form-label">Inventario</label>
+                                                            <input type="text" value="{{inventario}}"
+                                                                class="form-control" name="inventario">
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <label class="col-form-label">Fecha de vencimiento</label>
+                                                            <input type="date" {{#ifvalue fecha_vencimiento value='null'
+                                                                }}{{else}}value="{{fecha_vencimiento}}" {{/ifvalue}}
+                                                                class="form-control" name="fechavencimiento">
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button form="formularioinventario{{id_fechavencimiento}}"
+                                                            type="submit" class="btn btn-outline-success">Guardar
+                                                            Cambios</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="modal fade" id="ModalEliminarI{{id_fechavencimiento}}"
+                                        aria-labelledby="exampleModalLabel" aria-hidden="true">
+                                        <div class="modal-dialog">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h1 class="modal-title fs-5" id="exampleModalLabel">Eliminar
+                                                        Inventario
+                                                    </h1>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                                        aria-label="Close"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    ¿Estás seguro que desea continuar con esta acción?
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-primary"
+                                                        data-bs-dismiss="modal">Atrás</button>
+                                                    <a class="btn btn-outline-danger"
+                                                        href="/inventario/eliminarinventario/{{id_fechavencimiento}}">Continuar</a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {{/each}}
+                                </tbody>
+                            </table>
+                            {{else}}
+                            <h5 class="text-center text-danger">No hay inventario para mostrar</h5><br>
+                            {{/if}}
+                            <button type="button" class="btn btn-outline-success" data-bs-toggle="modal"
+                                data-bs-target="#ModalAñadirI" data-bs-whatever="@mdo">Añadir</button>
+                            <div class="modal fade" id="ModalAñadirI" aria-labelledby="exampleModalLabel"
+                                aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <form action="/inventario/anadirinventarios/{{producto.id_producto}}"
+                                            method="post" id="formularioanadirinventario">
+                                            <div class="modal-header">
+                                                <h1 class="modal-title fs-5" id="exampleModalLabel">Añadir
+                                                    Inventario
+                                                </h1>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                                    aria-label="Close"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <div class="mb-3">
+                                                    <label class="col-form-label">Inventario</label>
+                                                    <input type="text" class="form-control" name="inventario"
+                                                        required>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="col-form-label">Fecha de vencimiento</label>
+                                                    <input type="date" class="form-control" name="fechavencimiento">
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button form="formularioanadirinventario" type="submit"
+                                                    class="btn btn-outline-success">Guardar Cambios</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-success" type="submit" form="editarform">Guardar Cambios</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var modals = document.querySelectorAll('.modal');
+        modals.forEach(function (modal) {
+            modal.addEventListener('shown.bs.modal', function () {
+                var unitId = modal.getAttribute('data-id-unidad');
+                var idPrecio = modal.getAttribute('data-id-precio');
+                setSelectedUnit(modal, unitId, idPrecio);
+            });
+        });
+        function setSelectedUnit(modal, unitId, idPrecio) {
+            var selectElement = document.getElementById('unidadselect' + idPrecio);
+            if (selectElement) {
+                for (var i = 0; i < selectElement.options.length; i++) {
+                    var optionValue = selectElement.options[i].value;
+
+                    if (optionValue === unitId) {
+                        selectElement.selectedIndex = i;
+                        break;
+                    }
+                }
+            }
+        }
+    });
+</script>

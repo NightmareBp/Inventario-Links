@@ -1,0 +1,137 @@
+<form action="/compras/add" method="post">
+    <div class="container p-4">
+        <div class="row">
+            <div class="col-md-8 mx-auto">
+                <div class="card">
+                    <div class="card-header text-center">
+                        <h2>Registrar Compra</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-4">
+                            <label class="form-label" for="fecha">Fecha:</label>
+                            <input class="form-control" type="date" id="fecha" name="fechacompra" autofocus required>
+                        </div>
+                        <div class="text-center mb-4">
+                            <h4>PRODUCTOS</h4>
+                        </div>
+                        <div id="productos-container">
+                            <div class="card">
+                                <div class="input-group mb-3 mt-3">
+                                    <span class="input-group-text">Producto</span>
+                                    <select id="productoselect-0" name="producto" class="form-select form-select-sm"
+                                        aria-label=".form-select-sm example" required>
+                                        <option value="">Seleccione un Producto</option>
+                                        {{#each productos}}
+                                        <option value="{{id_producto}}">{{nombre_producto}}</option>
+                                        {{else}}
+                                        <option value="1">No hay nada para mostrar</option>
+                                        {{/each}}
+                                    </select>
+                                    <span class="input-group-text">Precio de Compra</span>
+                                    <select id="precioselect-0" name="preciocompra" class="form-select form-select-sm"
+                                        aria-label=".form-select-sm example" required>
+                                        <option value="">Seleccione un Precio</option>
+                                        <option value="">No hay nada para mostrar</option>
+                                    </select>
+                                </div>
+                                <div class="input-group mb-3">
+                                    <span class="input-group-text">Cantidad</span>
+                                    <input type="text" name="cantidad" class="form-control" required>
+                                    <span class="input-group-text">Fecha de Vencimiento</span>
+                                    <input type="date" name="fecha" class="form-control">
+                                    <button type="button" class="addproducto btn btn-outline-primary">+</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-end mt-3">
+                            <button type="submit" class="btn btn-success">Guardar Compra</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+</form>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        let productCounter = 1; // Contador para generar identificadores únicos
+
+        // Función para agregar un nuevo selector de productos
+        function addproducto() {
+            console.log("Añadiendo producto...");
+            const productoGroup = document.createElement('div');
+            productoGroup.classList.add('card', 'mb-3', 'mt-3');
+            productoGroup.innerHTML = `
+            <div class="input-group mb-3 mt-3">
+            <span class="input-group-text">Producto</span>
+            <select id="productoselect-${productCounter}" name="producto" class="form-select form-select-sm"
+            aria-label=".form-select-sm example" required>
+            <option value="">Seleccione un Producto</option>
+            {{#each productos}}
+            <option value="{{id_producto}}">{{nombre_producto}}</option>
+            {{else}}
+            <option value="1">No hay nada para mostrar</option>
+            {{/each}}
+            </select>
+            <span class="input-group-text">Precio de Compra</span>
+            <select id="precioselect-${productCounter}" name="preciocompra" class="form-select form-select-sm"
+            aria-label=".form-select-sm example" required>
+            <option value="">Seleccione un Precio</option>
+            <option value="">No hay nada para mostrar</option>
+            </select>
+            </div>
+            <div class="input-group mb-3">
+            <span class="input-group-text">Cantidad</span>
+            <input type="text" name="cantidad" class="form-control" required>
+            <span class="input-group-text">Fecha de Vencimiento</span>
+            <input type="date" name="fecha" class="form-control">
+            <button type="button" class="btn btn-outline-danger removeElementBtn">-</button>
+            </div>
+            `;
+            document.getElementById('productos-container').appendChild(productoGroup);
+            productoGroup.querySelector('.removeElementBtn').addEventListener('click', removeElement);
+
+            // Incrementar el contador para el próximo producto
+            productCounter++;
+        }
+
+        // Función para remover un elemento
+        function removeElement(event) {
+            event.target.parentNode.parentNode.remove();
+        }
+
+        // Evento de cambio en los selectores de productos
+        document.addEventListener('change', function (event) {
+            if (event.target.id.startsWith('productoselect-')) {
+                const productoId = event.target.value; // Obtener el ID del producto seleccionado
+                const precioSelectId = event.target.id.replace('productoselect-', 'precioselect-');
+                const precioSelect = document.getElementById(precioSelectId);
+
+                if (productoId === '') {
+                    // Si se selecciona "Seleccione un Producto", restablecer el selector de precios
+                    precioSelect.innerHTML = `<option value="">Seleccione un Precio</option>
+                                              <option value="">No hay nada para mostrar</option>`;
+                } else {
+                    // Realizar una solicitud AJAX al servidor para obtener los precios de compra del producto seleccionado
+                    fetch(`/compras/productos/${productoId}/preciosCompra`)
+                        .then(response => response.json())
+                        .then(data => {
+                            // Limpiar el selector de precios de compra
+                            precioSelect.innerHTML = '<option value="">Seleccione un Precio</option>';
+
+                            // Agregar las opciones de precios de compra recibidas del servidor al selector
+                            data.forEach(precio => {
+                                precioSelect.innerHTML += `<option value="${precio.id_precio}">S/. ${precio.precio_compra} (${precio.nombre_unidad})</option>`;
+                            });
+                        })
+                        .catch(error => console.error('Error al obtener los precios de compra:', error));
+                }
+            }
+        });
+
+        // Agregar event listener al primer selector de productos
+        document.querySelector('.addproducto').addEventListener('click', addproducto);
+
+    });
+</script>

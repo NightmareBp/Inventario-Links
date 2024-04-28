@@ -1,0 +1,47 @@
+<div class="container p-4">
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="card-header text-center">
+                <br>
+                <h3>Detalle de compra N° {{compra.id_compra}} realizada el día {{compra.fecha_compra}}</h3><br>
+            </div>
+            <table class="table table-striped-columns text-center">
+                <thead>
+                    <tr class="table-warning table-striped-columns">
+                        <th scope="col">Producto</th>
+                        <th scope="col">Unidad</th>
+                        <th scope="col">Precio por Unidad</th>
+                        <th scope="col">Cantidad Adquirida por Unidad</th>
+                        <th scope="col">Precio Parcial</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each detalles}}
+                    <tr>
+                        <td>{{nombre_producto}}</td>
+                        <td>{{nombre}} ({{cantidad}})</td>
+                        <td>S/. {{dividePrecioUnitario precio_parcial cantidad_producto}}</td>
+                        <td>{{cantidad_producto}}</td>
+                        <td>S/ {{precio_parcial}}</td>
+                    </tr>
+                    {{/each}}
+                    <tr class="table-success">
+                        <th colspan="4" scope="row">Monto Total</th>
+                        <td>S/ {{compra.monto_total}}</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="d-grid gap-2">
+                <a class="btn btn-success" href="/compras">Volver a compras</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Función para calcular el precio unitario
+    function dividePrecioUnitario(precio_parcial, cantidad_insumo) {
+        var precioUnitario = parseFloat(precio_parcial) / parseFloat(cantidad_insumo);
+        return precioUnitario.toFixed(2); // Ajusta el resultado a 2 decimales
+    }
+</script>

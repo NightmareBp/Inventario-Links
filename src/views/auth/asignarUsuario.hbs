@@ -1,0 +1,65 @@
+<div class="container p-4">
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="card-header text-center">
+                <h2>Lista de Usuarios</h2>
+                <div class="d-grid gap-2"><br>
+                    <a class="btn btn-success" href="/usuario/add">Registrar Nuevo Usuario</a>
+                </div><br>
+            </div>
+            {{#if usuarios}}
+            <table class="table table-striped-columns">
+                <thead>
+                    <tr class="table-primary text-center">
+                        <th scope="col">Nombre</th>
+                        <th scope="col">Usuario</th>
+                        <th scope="col">Cargo</th>
+                        <th scope="col">Eliminar</th>
+                    </tr>
+                </thead>
+                {{#each usuarios}}
+                <tr class="text-center">
+                    <td>{{nombre}}</td>
+                    <td>{{usuario}}</td>
+                    {{#ifvalue tipo value=1}}
+                    <td>Gerente</td>
+                    {{/ifvalue}}
+                    {{#ifvalue tipo value=2}}
+                    <td>Vendedor</td>
+                    {{/ifvalue}}
+                    <td><button type="button" class="btn btn-outline-danger" data-bs-toggle="modal"
+                            data-bs-target="#ModalEliminar{{id_usuario}}">
+                            Eliminar
+                        </button>
+                    </td>
+                    <div class="modal fade" id="ModalEliminar{{id_usuario}}" aria-labelledby="exampleModalLabel"
+                        aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h1 class="modal-title fs-5" id="exampleModalLabel">Eliminar
+                                        Usuario
+                                    </h1>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                        aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    ¿Estás seguro que desea continuar con esta acción?
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Atrás</button>
+                                    <a class="btn btn-outline-danger"
+                                        href="/eliminarusuario/{{id_usuario}}">Continuar</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </tr>
+                {{/each}}
+                </tbody>
+            </table>
+            {{else}}
+            {{/if}}
+        </div>
+    </div>
+</div>

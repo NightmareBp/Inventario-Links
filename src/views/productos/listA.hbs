@@ -1,0 +1,120 @@
+<div class="container text-center mt-4">
+    <a href="/inventario" class="text-dark" style="text-decoration: none;">
+        <h2>Inventario de Productos</h2>
+    </a>
+    <form action="/inventario" method="GET" class="mb-3">
+        <div class="input-group mt-4 mb-4">
+            <input id="searchInput" type="text" class="form-control" placeholder="Buscar producto" name="q">
+            <button class="btn btn-primary" type="submit">Buscar</button>
+        </div>
+    </form>
+    <div class="table-responsive">
+        {{#if productos}}
+        <table class="table table-striped-columns">
+            <thead>
+                <tr>
+                    <th>Imagen</th>
+                    <th>Nombre</th>
+                    <th>Inventario</th>
+                    <th>Precio de Venta</th>
+                    {{#ifvalue user.tipo value=1}}<th>Precio de Compra</th>
+                    <th>Editar</th>
+                    {{/ifvalue}}
+                </tr>
+            </thead>
+            <tbody class="table-group-divider">
+                {{#each productos}}
+                <tr {{#ifvalue estado_producto value=1}}class="table-success" {{/ifvalue}} {{#ifvalue estado_producto
+                    value=2}}class="table-warning" {{/ifvalue}} {{#ifvalue estado_producto value=3}}class="table-danger"
+                    {{/ifvalue}}>
+                    <td><img src="{{imagen}}" alt="{{nombre_producto}}" width="50"></td>
+                    <td>{{nombre_producto}}</td>
+                    <td>
+                        <select class="form-select">
+                            <option>Inventario Total: {{inventarioTotal}}</option>
+                            {{#each fechasVencimiento}}
+                            <option>Inventario: {{inventario}} ({{fecha_vencimiento}})
+                            </option>
+                            {{/each}}
+                        </select>
+                    </td>
+                    <td>
+                        <select class="form-select">
+                            {{#each preciosventa}}
+                            <option>S/. {{id_precio}}{{precio_venta}} ({{unidad}})
+                            </option>
+                            {{/each}}
+                        </select>
+                    </td>
+                    {{#ifvalue ../user.tipo value=1}}
+                    <td>
+                        <select class="form-select">
+                            {{#each precioscompra}}
+                            <option>S/. {{precio_compra}} ({{unidad}})
+                            </option>
+                            {{/each}}
+                        </select>
+                    </td>
+                    <td><a class="btn btn-outline-primary" href="/inventario/edit/{{id_producto}}">Editar</a>
+                    </td>
+                    {{/ifvalue}}
+                </tr>
+                {{/each}}
+            </tbody>
+        </table>
+        {{else}}
+        <div class="container">
+            <div class="row mt-5">
+                <h2>No hay productos para mostrar</h2>
+            </div>
+        </div>
+        {{/if}}
+    </div>
+</div>
+<script>
+    document.getElementById('searchInput').addEventListener('keyup', function () {
+        const query = this.value.trim(); // Obtener el valor del campo de búsqueda
+        fetch(`/productos?q=${query}`) // Realizar solicitud AJAX con el término de búsqueda
+            .then(response => response.json())
+            .then(data => {
+                // Actualizar la tabla de productos con los resultados de la búsqueda
+                const productosTableBody = document.getElementById('productosTableBody');
+                productosTableBody.innerHTML = '';
+                data.forEach(producto => {
+                    const row = `
+                        <tr>
+                            <td><img src="${producto.imagen}" alt="${producto.nombre_producto}" width="50"></td>
+                            <td>${producto.nombre_producto}</td>
+                            <td>
+                                <select class="form-select">
+                                    <option>Inventario Total: ${producto.inventarioTotal}</option>
+                                    ${producto.fechasVencimiento.map(fecha => `
+                                        <option>Inventario: ${fecha.inventario} (${fecha.fecha_vencimiento})</option>
+                                    `).join('')}
+                                </select>
+                            </td>
+                            <td>
+                                <select class="form-select">
+                                    ${producto.preciosventa.map(precio => `
+                                        <option>S/. ${precio.precio_venta} (${precio.unidad})</option>
+                                    `).join('')}
+                                </select>
+                            </td>
+                            ${producto.precioscompra ? `
+                                <td>
+                                    <select class="form-select">
+                                        ${producto.precioscompra.map(precio => `
+                                            <option>S/. ${precio.precio_compra} (${precio.unidad})</option>
+                                        `).join('')}
+                                    </select>
+                                </td>
+                                <td><a class="btn btn-outline-primary" href="/inventario/edit/${producto.id_producto}">Editar</a></td>
+                            ` : ''}
+                        </tr>
+                    `;
+                    productosTableBody.innerHTML += row;
+                });
+            })
+            .catch(error => console.error('Error al realizar la solicitud AJAX:', error));
+    });
+</script>

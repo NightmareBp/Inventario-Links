@@ -1,0 +1,114 @@
+<div style="height: 100vh;" class="container text-center mt-4">
+    <div class="card col-md-8 m-auto">
+        <div class="card-header d-flex justify-content-between">
+            Notificaciones
+        </div>
+        {{#if notis}}
+        <div class="row">
+            {{#each notis}}
+            <div class="">
+                <div class="card-body {{#ifvalue estado value=1}}{{#ifvalue existencias value=2}}text-bg-warning{{/ifvalue}}
+            {{#ifvalue existencias value=3}}text-bg-danger{{/ifvalue}}
+            {{#ifvalue existencias value=null}}text-bg-secondary{{/ifvalue}}
+            {{/ifvalue}} border-bottom">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <p class="card-text">{{contenido}}</p>
+
+                        </div>
+                        <div class="col-md-2">
+                            <button type="button" class="btn btn-success btn-ver-detalle" data-bs-toggle="modal"
+                                data-bs-target="#Modal{{id_notificacion}}" data-bs-whatever="@mdo"
+                                data-id-notificacion="{{id_notificacion}}">Ver Detalle</button>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-end">
+                                <h6 class="text-end"><button type="button" class="btn btn-close" data-bs-toggle="modal"
+                                        data-bs-target="#ModalBorrar{{id_notificacion}}"></button></h6>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal fade" id="Modal{{id_notificacion}}" tabindex="-1" aria-labelledby="exampleModalLabel"
+                aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h1 class="modal-title fs-5" id="exampleModalLabel">{{#if
+                                fecha_vencimiento}}Notificación de
+                                Vencimiento{{else}}Notificación de Agotamiento{{/if}}</h1>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="card-body">
+                                <p class="card-text">{{contenido}}</p>
+                                <p class="card-text">{{#if fecha_vencimiento}}El producto vencerá el día
+                                    {{fecha_vencimiento}}{{/if}}</p>
+                                <h6 class="text-end">{{fecha_noti}}</h6>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <a href="/inventario?q={{nombre}}" class="btn btn-primary">Ver Producto</a>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal fade" id="ModalBorrar{{id_notificacion}}" aria-labelledby="exampleModalLabel"
+                aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h1 class="modal-title fs-5" id="exampleModalLabel">Eliminar
+                                Notificación
+                            </h1>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            ¿Estás seguro que desea continuar con esta acción?
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Atrás</button>
+                            <a class="btn btn-outline-danger"
+                                href="/notificaciones/eliminarnoti/{{id_notificacion}}">Continuar</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {{/each}}
+        </div>
+    </div>
+    {{else}}
+    <div class="container">
+        <div class="row mt-5 mb-5">
+            <h2>No hay notificaciones para mostrar</h2>
+        </div>
+    </div>
+    {{/if}}
+</div>
+<script>
+    $(document).ready(function () {
+        // Función para manejar el clic en el botón "Ver Detalle"
+        $('.btn-ver-detalle').on('click', function () {
+            var idNotificacion = $(this).data('id-notificacion');
+
+            // Envía una solicitud AJAX al servidor para actualizar el estado de la notificación
+            $.ajax({
+                url: '/notificaciones/actualizar_estado_notificacion',
+                method: 'POST',
+                data: { idNotificacion: idNotificacion },
+                success: function (response) {
+                    // Aquí puedes realizar alguna acción adicional si es necesario
+                },
+                error: function (xhr, status, error) {
+                    // Manejar el error si es necesario
+                }
+            });
+        });
+        $('[id^="Modal"]').on('hidden.bs.modal', function () {
+            // Recargar la página para refrescar las notificaciones
+            location.reload();
+        });
+    });
+</script>

@@ -1,0 +1,39 @@
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="card-header text-center">
+                <h2>Compras</h2>
+            </div>
+            <div class="d-grid gap-2"><br>
+                <a class="btn btn-success" href="/compras/add">Registrar Nueva Compra</a>
+            </div><br>
+            {{#if compras}}
+            <table class="table table-striped-columns text-center">
+                <thead>
+                    <tr class="table-primary">
+                        <th scope="col">Fecha</th>
+                        <th scope="col">Monto Total</th>
+                        <th scope="col">Detalle Compra</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each compras}}
+                    <tr>
+                        <th>{{fecha_compra}}</th>
+                        <td>S/. {{monto_total}}</td>
+                        <td><a class="btn btn-outline-secondary" href="/compras/detalle/{{id_compra}}">Ver
+                                Detalle</a></td>
+                    </tr>
+                    {{/each}}
+                </tbody>
+            </table>
+            {{else}}
+            <div class="container text-center">
+                <div class="row mt-5">
+                    <h3>No hay compras para mostrar</h3>
+                </div>
+            </div>
+            {{/if}}
+        </div>
+    </div>
+</div>

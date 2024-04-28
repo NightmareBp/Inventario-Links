@@ -1,0 +1,16 @@
+<div class="hide-scrollbar">
+    <main class="index">
+        <div class="masthead d-flex">
+            <div class="container text-center"><br><br>
+                <img src="/img/Bodega.png" width="350" class="rounded mx-auto d-block img-fluid" alt="Logo Mikeila">
+                <h1 class="mb-1">Control de Inventario</h1>
+                <h3 class="mb-5"><em>Existencias y Vencimientos</em></h3>
+                {{#if user.nombre}}
+                <a href="/inventario" class="btn btn-primary btn-lg">Ver inventario</a>
+                {{else}}
+                <a href="/signin" class="btn btn-primary btn-lg">Ingresar</a>
+                {{/if}}
+            </div>
+        </div>
+    </main>
+</div>

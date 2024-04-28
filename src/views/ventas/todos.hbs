@@ -1,0 +1,88 @@
+<style>
+    .disabled-link {
+        pointer-events: none;
+        /* Evita que el enlace sea clickeable */
+        cursor: not-allowed;
+        /* Cambia el cursor a "no permitido" */
+        opacity: 0.5;
+        /* Reduce la opacidad para mostrar el enlace como desactivado */
+    }
+</style>
+<div class="container p-4">
+    <div class="row">
+        <div class="col-md-12 mx-auto">
+            <div class="card-header text-center">
+                <br>
+                <h3>PEDIDOS</h3>
+            </div><br>
+            <table class="table table-striped-columns text-center">
+                <thead>
+                    <tr class="table-primary">
+                        <th scope="col">Id del pedido</th>
+                        <th scope="col">Cliente</th>
+                        <th scope="col">Fecha</th>
+                        <th scope="col">Dirección</th>
+                        <th scope="col">Costo de Envío</th>
+                        <th scope="col">Monto total</th>
+                        <th scope="col">Estado del Pedido</th>
+                        <th scope="col">Ver Detalle</th>
+                        <th scope="col">Aprobar Pedido</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each pedidos}}
+                    <div class="modal fade" id="confirmModal{{id_pedido}}" tabindex="-1"
+                        aria-labelledby="confirmModalLabel" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="confirmModalLabel">Confirmar Pedido</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                        aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    ¿Estás seguro de que deseas aprobar el pedido?
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary"
+                                        data-bs-dismiss="modal">Cancelar</button>
+                                    <a class="btn btn-success" href="/pedidos/aprobar/{{id_pedido}}">Aprobar
+                                        Pedido</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <tr>
+                        <th scope="row">{{id_pedido}}</th>
+                        <td>{{nom_cliente}}</td>
+                        <td>{{fecha_pedido}}</td>
+                        <td>{{direc_pedido}}</td>
+                        <td>{{costo_envio}}</td>
+                        <td>{{monto_total}}</td>
+                        <td>{{nombre_estado_pedido}}</td>
+                        <td><a class="btn btn-outline-primary" href="/pedidos/detalles/{{id_pedido}}">Ver Detalle</a>
+                        </td>
+                        {{#if costo_envio}}
+                        <td><a class="btn btn-outline-success disabled-link"
+                                href="/pedidos/aprobar/{{id_compra}}">Aprobar
+                                Pedido</a></td>
+                        {{else}}
+                        {{#ifvalue Id_estado_pedido value=1}}
+                        <td><button type="button" class="btn btn-outline-success" data-bs-toggle="modal"
+                                data-bs-target="#confirmModal{{id_pedido}}">
+                                Aprobar pedido
+                            </button>
+                        </td>
+                        {{else}}
+                        <td><a class="btn btn-outline-success disabled-link"
+                                href="/pedidos/aprobar/{{id_compra}}">Aprobar
+                                Pedido</a></td>
+                        {{/ifvalue}}
+                        {{/if}}
+                    </tr>
+                    {{/each}}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

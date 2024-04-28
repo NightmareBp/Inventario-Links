@@ -1,0 +1,130 @@
+<header class="navbar navbar-expand-lg sticky-top bg-dark">
+    <nav class="container-xxl navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <img src="/img/Logo Link.png" alt="Mikeila" width="100">
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false"
+                aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+                    {{#if user.nombre}}
+                    {{#ifvalue user.tipo value=1}}
+                    <li class="nav-item">
+                        <a href="/notificaciones" class="nav-link">
+                            <i class="fas fa-bell"></i>
+                            <span id="notificationCount" class="notification-count"></span>
+                        </a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button"
+                            data-bs-toggle="dropdown" aria-expanded="false">
+                            Gestionar Productos
+                        </a>
+                        <ul class="dropdown-menu m-auto" aria-labelledby="navbarDropdown">
+                            <li><a class="dropdown-item" href="/inventario">Ver Inventario</a></li>
+                            <li>
+                                <hr class="dropdown-divider">
+                            </li>
+                            <li><a class="dropdown-item" href="/inventario/add">Añadir Producto</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button"
+                            data-bs-toggle="dropdown" aria-expanded="false">
+                            Gestionar Negocio
+                        </a>
+                        <ul class="dropdown-menu m-auto" aria-labelledby="navbarDropdown">
+                            <li><a class="dropdown-item" href="/compras">Ver Compras</a></li>
+                            <li>
+                                <hr class="dropdown-divider">
+                            </li>
+                            <li><a class="dropdown-item" href="/compras/add">Registrar Compra</a></li>
+                            <li>
+                                <hr class="dropdown-divider">
+                            </li>
+                            <li><a class="dropdown-item" href="/ventas">Ver Ventas</a></li>
+                            <li>
+                                <hr class="dropdown-divider">
+                            </li>
+                            <li><a class="dropdown-item" href="/ventas/add">Registrar Venta</a></li>
+                            <li>
+                                <hr class="dropdown-divider">
+                            </li>
+                            <li><a class="dropdown-item" href="/asignarUsuario">Ver Usuarios del Sistema</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/ventas/add" class="nav-link">Realizar Venta</a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/Perfil" class="nav-link">Perfil</a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/logout" class="nav-link">Salir</a>
+                    </li>
+                    {{/ifvalue}}
+                    {{#ifvalue user.tipo value=2}}
+                    <li class="nav-item">
+                        <a href="/notificaciones" class="nav-link">
+                            <i class="fas fa-bell"></i>
+                            <span id="notificationCount" class="notification-count">{{countNotifications}}</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/inventario" class="nav-link">Ver inventario</a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/ventas/add" class="nav-link">Realizar Venta</a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/ventas" class="nav-link">Ver Ventas</a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/Perfil" class="nav-link">Perfil</a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/logout" class="nav-link">Salir</a>
+                    </li>
+                    {{/ifvalue}}
+                    {{else}}
+                    <li class="nav-item">
+                        <a href="/signin" class="nav-link">Ingresa</a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/signup" class="nav-link">Regístrate</a>
+                    </li>
+                    {{/if}}
+                </ul>
+            </div>
+        </div>
+    </nav>
+</header>
+<script>
+    // Función para cargar el número de notificaciones
+    async function loadNotificationCount() {
+        try {
+            const response = await fetch('/notificaciones/notificationCount'); // Realizar la solicitud al servidor
+            const data = await response.json(); // Obtener los datos de la respuesta
+            const count = data.cuenta; // Extraer el número de notificaciones del objeto de respuesta
+            $('#notificationCount').text(count); // Actualizar el contador de notificaciones en el HTML
+
+            // Hacer visible el contador solo si hay notificaciones sin abrir
+            if (count > 0) {
+                $('#notificationCount').show();
+            } else {
+                $('#notificationCount').hide();
+            }
+        } catch (error) {
+            console.error('Error al cargar el número de notificaciones:', error);
+        }
+    }
+
+    // Llamar a la función para cargar el número de notificaciones al cargar la página
+    $(document).ready(() => {
+        loadNotificationCount();
+    });
+</script>

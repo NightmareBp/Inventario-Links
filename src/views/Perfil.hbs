@@ -1,0 +1,92 @@
+<div class="container p-4">
+    <div class="row">
+        <div class="col-md-6 mx-auto">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row text-center">
+                        <h3>Bienvenido<br>
+                            <img src="/img/user-profile.jpg" width="200" class="rounded mx-auto d-block">{{user.nombre}}<h4>@{{user.usuario}}</h4>
+                        </h3>
+                    </div>
+                    {{#ifvalue user.tipo value=1}}
+                    <div class="row">
+                        <div class="d-grid gap-2">
+                            <a href="/inventario" class="btn btn-outline-primary m-2">Ver Inventario</a>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <a href="/asignarUsuario" class="btn btn-outline-primary m-2">Administrar usuarios del sistema</a>
+                        </div>
+                        <div class="d-grid gap-2"><button type="button" class="btn btn-outline-primary m-2"
+                                data-bs-toggle="modal" data-bs-target="#modificar">
+                                Modificar Datos
+                            </button>
+                        </div>
+                        <div class="d-grid gap-2"><button type="button" class="btn btn-outline-primary m-2"
+                                data-bs-toggle="modal" data-bs-target="#cambiar">
+                                Cambiar Contraseña
+                            </button>
+                        </div>
+                    </div>
+                    <form action="/Perfil" method="POST">
+                        <div class="modal fade" id="modificar" tabindex="-1" aria-labelledby="confirmModalLabel"
+                            aria-hidden="true">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header text-center">
+                                        <h5 class="modal-title text-center" id="confirmModalLabel">MODIFICAR DATOS</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                            aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="mb-3">
+                                            <label class="form-label">Ingrese su contraseña para continuar</label>
+                                            <br><input type="password" name="contra" placeholder="Contraseña"
+                                                class="form-control" autofocus required>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary"
+                                            data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="submit" class="btn btn-success">Modificar Datos</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                    <form action="/PerfilContra" method="POST">
+                        <div class="modal fade" id="cambiar" tabindex="-1" aria-labelledby="confirmModalLabel"
+                            aria-hidden="true">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header text-center">
+                                        <h5 class="modal-title text-center" id="confirmModalLabel">Cambiar Contraseña</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                            aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="mb-3">
+                                            <label class="form-label">Ingrese su contraseña actual</label>
+                                            <br><input type="password" name="contra" placeholder="Contraseña Actual"
+                                                class="form-control" autofocus required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Ingrese su nueva contraseña</label>
+                                            <br><input type="password" name="contranueva" placeholder="Contraseña Nueva"
+                                                class="form-control" autofocus required>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary"
+                                            data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="submit" class="btn btn-success">Guardar Cambios</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                    {{/ifvalue}}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

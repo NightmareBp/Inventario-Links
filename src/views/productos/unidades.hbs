@@ -1,0 +1,50 @@
+<div class="container p-4">
+    <div class="row">
+        <div class="col-md-4 mx-auto">
+            <div class="card">
+                <div class="card-header text-center">
+                    <h3>UNIDAD</h3>
+                </div>
+                <div class="card-body">
+                    <form action="/inventario/unidades" method="POST">
+                        <div class="mb-3">
+                            <label class="form-label">Nombre de la Unidad</label>
+                            <input type="text" class="form-control" name="nombre" autofocus>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Cantidad de Referencia</label>
+                            <input type="text" class="form-control" name="cantidad" autofocus>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-success" type="submit">Agregar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-8 mx-auto">
+            <div class="card-header text-center">
+                <h3>TABLA DE UNIDADES</h3>
+            </div>
+            <table class="table">
+                <thead>
+                    <tr>             
+                        <th scope="col">Nombre de la Unidad</th>
+                        <th scope="col">Cantidad de Referencia</th>
+                        <th scope="col">Editar</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each unidades}}
+                    <tr>
+                        <td>{{nombre}}</td>
+                        <td>{{cantidad}}</td>
+                        <td><a class="btn btn-outline-primary"
+                                href="/inventario/unidades/edit/{{id_unidad}}">Editar</a></td>
+                    </tr>
+                    {{/each}}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
