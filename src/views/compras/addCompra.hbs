@@ -16,7 +16,7 @@
                         </div>
                         <div id="productos-container">
                             <div class="card">
-                                <div class="input-group mb-3 mt-3">
+                                <div class="input-group mt-3">
                                     <span class="input-group-text">Producto</span>
                                     <select id="productoselect-0" name="producto" class="form-select form-select-sm"
                                         aria-label=".form-select-sm example" required>
@@ -27,6 +27,8 @@
                                         <option value="1">No hay nada para mostrar</option>
                                         {{/each}}
                                     </select>
+                                </div>
+                                <div class="input-group mb-3 mt-3">
                                     <span class="input-group-text">Precio de Compra</span>
                                     <select id="precioselect-0" name="preciocompra" class="form-select form-select-sm"
                                         aria-label=".form-select-sm example" required>
@@ -37,6 +39,8 @@
                                 <div class="input-group mb-3">
                                     <span class="input-group-text">Cantidad</span>
                                     <input type="text" name="cantidad" class="form-control" required>
+                                </div>
+                                <div class="input-group mb-3">
                                     <span class="input-group-text">Fecha de Vencimiento</span>
                                     <input type="date" name="fecha" class="form-control">
                                     <button type="button" class="addproducto btn btn-outline-primary">+</button>
@@ -63,7 +67,7 @@
             const productoGroup = document.createElement('div');
             productoGroup.classList.add('card', 'mb-3', 'mt-3');
             productoGroup.innerHTML = `
-            <div class="input-group mb-3 mt-3">
+            <div class="input-group mt-3">
             <span class="input-group-text">Producto</span>
             <select id="productoselect-${productCounter}" name="producto" class="form-select form-select-sm"
             aria-label=".form-select-sm example" required>
@@ -74,6 +78,8 @@
             <option value="1">No hay nada para mostrar</option>
             {{/each}}
             </select>
+            </div>
+            <div class="input-group mb-3 mt-3">
             <span class="input-group-text">Precio de Compra</span>
             <select id="precioselect-${productCounter}" name="preciocompra" class="form-select form-select-sm"
             aria-label=".form-select-sm example" required>
@@ -84,6 +90,8 @@
             <div class="input-group mb-3">
             <span class="input-group-text">Cantidad</span>
             <input type="text" name="cantidad" class="form-control" required>
+            </div>
+            <div class="input-group mb-3">
             <span class="input-group-text">Fecha de Vencimiento</span>
             <input type="date" name="fecha" class="form-control">
             <button type="button" class="btn btn-outline-danger removeElementBtn">-</button>
