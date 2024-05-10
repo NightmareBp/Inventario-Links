@@ -13,7 +13,6 @@
         <table class="table table-striped-columns">
             <thead>
                 <tr>
-                    <th>Imagen</th>
                     <th>Nombre</th>
                     <th>Inventario</th>
                     <th>Precio de Venta</th>
@@ -27,7 +26,6 @@
                 <tr {{#ifvalue estado_producto value=1}}class="table-success" {{/ifvalue}} {{#ifvalue estado_producto
                     value=2}}class="table-warning" {{/ifvalue}} {{#ifvalue estado_producto value=3}}class="table-danger"
                     {{/ifvalue}}>
-                    <td><img src="{{imagen}}" alt="{{nombre_producto}}" width="50"></td>
                     <td>{{nombre_producto}}</td>
                     <td>
                         <select class="form-select">

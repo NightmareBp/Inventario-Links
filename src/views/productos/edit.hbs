@@ -14,42 +14,6 @@
                                 autofocus required>
                         </div>
                         <div class="input-group mb-3">
-                            <input type="hidden" name="imagenantigua" value="{{producto.imagen}}">
-                            <div class="col-lg-4 text-center"><label class="form-label">Imagen</label><br><img
-                                    src="{{producto.imagen}}" alt="{{producto.nombre_producto}}" width="125"></div>
-                            <div class="col-lg-8"><label class="form-label">Cambiar Imagen</label>
-                                <input type="file" accept="image/*" class="form-control" name="imagen"><br>
-                                {{#ifvalue producto.imagen value="/img/predeterminadoproducto.png"}}{{else}}
-                                <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal"
-                                    data-bs-target="#ModalEliminarImagen">
-                                    Eliminar Imagen
-                                </button>
-                                <div class="modal fade" id="ModalEliminarImagen" aria-labelledby="exampleModalLabel"
-                                    aria-hidden="true">
-                                    <div class="modal-dialog">
-                                        <div class="modal-content">
-                                            <div class="modal-header">
-                                                <h1 class="modal-title fs-5" id="exampleModalLabel">Eliminar Imagen
-                                                </h1>
-                                                <button type="button" class="btn-close" data-bs-dismiss="modal"
-                                                    aria-label="Close"></button>
-                                            </div>
-                                            <div class="modal-body">
-                                                ¿Estás seguro que desea continuar con esta acción?
-                                            </div>
-                                            <div class="modal-footer">
-                                                <button type="button" class="btn btn-primary"
-                                                    data-bs-dismiss="modal">Atrás</button>
-                                                <a class="btn btn-outline-danger"
-                                                    href="/inventario/eliminarimagen/{{producto.id_producto}}">Continuar</a>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                {{/ifvalue}}
-                            </div>
-                        </div>
-                        <div class="input-group mb-3">
                             <span class="input-group-text">Cantidad Límite</span>
                             <input type="number" value="{{producto.cantidad_limite}}" class="form-control"
                                 name="cantidadlimite" required>

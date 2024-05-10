@@ -241,12 +241,6 @@ router.post('/add', isLoggedInAdmin, upload.single('imagen'), async (req, res) =
                 }
             }
         }
-        let rutaimagen = '/img/predeterminadoproducto.png';
-        if (req.file) {
-            rutaimagen = '/uploads/' + req.file.originalname; // Ruta donde se guardará la imagen
-            const fs = require('fs');
-            fs.renameSync(req.file.path, './src/public/uploads/' + req.file.originalname);
-        }
         const fechanoti = (anos || meses || dias) ? (365 * anos + 30 * meses + dias) : null; // Si no hay años, meses o días, fechanoti será null
         const inventarioTotal = calcularInventarioTotal(cantidadesinicial);
         const estado = calcularEstadoProducto(inventarioTotal, cantidadlimite);
@@ -254,7 +248,6 @@ router.post('/add', isLoggedInAdmin, upload.single('imagen'), async (req, res) =
         // Insertar el producto en la base de datos
         const result = await pool.query('INSERT INTO Productos SET ?', {
             nombre_producto: nombre,
-            imagen: rutaimagen,
             cantidad_limite: cantidadlimite,
             fecha_notificacion: fechanoti,
             estado_producto: estado
@@ -344,10 +337,9 @@ router.get('/edit/:id', isLoggedInAdmin, async (req, res) => {
 });
 
 router.post('/edit/:id', isLoggedInAdmin, upload.single('imagen'), async (req, res) => {
-    console.log(req.body);
     try {
         const { id } = req.params;
-        let { nombre, cantidadlimite, anos, meses, dias, imagenantigua } = req.body;
+        let { nombre, cantidadlimite, anos, meses, dias } = req.body;
         let productoExistente = await pool.query('SELECT * FROM Productos WHERE nombre_producto = ? AND id_producto <> ?', [nombre, id]);
         anos = anos ? anos : 0;
         meses = meses ? meses : 0;
@@ -360,25 +352,8 @@ router.post('/edit/:id', isLoggedInAdmin, upload.single('imagen'), async (req, r
         if (fechanoti === 0) {
             fechanoti = null;
         }
-        let rutaimagen = imagenantigua; // mantener la imagen existente como predeterminada
-        if (req.file) {
-            // Eliminar la imagen anterior (opcional)
-            if (imagenantigua !== '/img/predeterminadoproducto.png') {
-                try {
-                    fs.unlinkSync('./src/public' + imagenantigua); // Elimina la imagen anterior
-                } catch (error) {
-                    // Capturar el error si el archivo no existe
-                    console.error('Error al eliminar la imagen anterior:', error);
-                }
-            }
-            // Establecer la nueva imagen
-            rutaimagen = '/uploads/' + req.file.originalname; // Ruta donde se guardará la nueva imagen
-            fs.renameSync(req.file.path, './src/public/uploads/' + req.file.originalname);
-        }
-        // Insertar el producto en la base de datos
         const nuevolink = {
             nombre_producto: nombre,
-            imagen: rutaimagen,
             cantidad_limite: cantidadlimite,
             fecha_notificacion: fechanoti,
         };
@@ -520,16 +495,6 @@ router.get('/eliminarinventario/:id', isLoggedInAdmin, async (req, res) => {
     await pool.query('Update Productos set estado_producto = ? WHERE id_producto = ?', [nuevoestadoproducto, resultado[0].id_producto]);
     req.flash('noti', 'Inventario Eliminado Correctamente');
     res.redirect('/inventario/edit/' + resultado[0].id_producto);
-});
-
-router.get('/eliminarimagen/:id', isLoggedInAdmin, async (req, res) => {
-    const { id } = req.params;
-    const rutaimagen = '/img/predeterminadoproducto.png';
-    const resultado = await pool.query('Select * from Productos WHERE id_producto = ?', [id]);
-    fs.unlinkSync('./src/public' + resultado[0].imagen);
-    await pool.query('Update Productos set imagen = ? WHERE id_producto = ?', [rutaimagen, id]);
-    req.flash('noti', 'Imagen Eliminada Correctamente');
-    res.redirect('/inventario/edit/' + id);
 });
 
 router.post('/anadirprecios/:id', isLoggedInAdmin, async (req, res) => {

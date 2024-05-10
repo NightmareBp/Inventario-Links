@@ -1,7 +1,6 @@
 CREATE TABLE Productos (
     id_producto INTEGER AUTO_INCREMENT,
     nombre_producto VARCHAR(40) NOT NULL,
-    imagen VARCHAR(255) NULL,
     cantidad_limite INTEGER NULL,
     fecha_notificacion INTEGER NULL,
     estado_producto INTEGER NOT NULL,
