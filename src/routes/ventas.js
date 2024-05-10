@@ -5,16 +5,39 @@ const fs = require('fs');
 const pool = require('../database');
 const { isLoggedIn } = require('../lib/auth');
 
-router.get('/', isLoggedIn, async (req, res) => {
-    const ventas = await pool.query('SELECT * FROM Ventas ORDER BY fecha_venta DESC, id_venta DESC;');
-    var fechaBaseDatos = new Date();
-    const opcionesFormato = { weekday: 'long', year: 'numeric', month: 'numeric', day: 'numeric' };
-    ventas.forEach((element) => {
-        fechaBaseDatos = element.fecha_venta
-        element.fecha_venta = fechaBaseDatos.toLocaleDateString('es-ES', opcionesFormato);
-        element.monto_total = parseFloat(element.monto_total).toFixed(2);
-    })
-    res.render('ventas/listV', { ventas });
+router.get('/', async (req, res) => {
+    try {
+        const { q, q1 } = req.query;
+        const queryParams = [];
+        let query = 'SELECT * FROM Ventas WHERE fecha_venta BETWEEN ? AND ? ORDER BY fecha_venta DESC';
+
+        if (q && q1) {
+            queryParams.push(q, q1);
+
+        } else {
+            // Si no se proporcionan ambas fechas, muestra todas las compras
+            query = 'SELECT * FROM Ventas ORDER BY fecha_venta DESC';
+        }
+
+        const ventas = await pool.query(query, queryParams);
+
+        // Formatear las fechas y montos antes de renderizar la vista
+        ventas.forEach((element) => {
+            const fechaVenta = new Date(element.fecha_venta);
+            element.fecha_venta = fechaVenta.toLocaleDateString('es-ES', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'numeric',
+                day: 'numeric'
+            });
+            element.monto_total = parseFloat(element.monto_total).toFixed(2);
+        });
+
+        res.render('ventas/listV', { ventas, q, q1 });
+    } catch (error) {
+        console.error('Error al obtener las compras:', error);
+        res.status(500).send('Error interno del servidor');
+    }
 });
 
 router.get('/add', isLoggedIn, async (req, res) => {

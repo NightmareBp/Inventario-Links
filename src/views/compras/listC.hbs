@@ -2,11 +2,21 @@
     <div class="row">
         <div class="col-md-8 mx-auto">
             <div class="card-header text-center">
-                <h2>Compras</h2>
+                <a href="/compras" class="text-dark" style="text-decoration: none;"><h2>Compras</h2></a>
             </div>
-            <div class="d-grid gap-2"><br>
+            <div class="d-grid gap-2 mb-3 mt-4">
                 <a class="btn btn-success" href="/compras/add">Registrar Nueva Compra</a>
-            </div><br>
+            </div>
+            <form action="/compras" method="GET">
+                <h5 class="mb-3 text-center">Filtrar por fechas</h5>
+                <div class="input-group mb-3">
+                    <span class="input-group-text">Fecha inicial</span>
+                    <input type="date" class="form-control" name="q" value="{{q}}" aria-label="">
+                    <span class="input-group-text">Fecha final</span>
+                    <input type="date" class="form-control" name="q1" value="{{q1}}" aria-label="">
+                    <button class="btn btn-primary" type="submit">Filtrar</button>
+                </div>
+            </form>
             {{#if compras}}
             <table class="table table-striped-columns text-center">
                 <thead>
