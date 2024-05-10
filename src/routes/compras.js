@@ -8,10 +8,11 @@ router.get('/', isLoggedInAdmin, async (req, res) => {
         const { q, q1 } = req.query;
         const queryParams = [];
         let query = 'SELECT * FROM Compras WHERE fecha_compra BETWEEN ? AND ? ORDER BY fecha_compra DESC';
-
+        let montototall = null;
         if (q && q1) {
             queryParams.push(q, q1);
-
+            montototal = await pool.query('SELECT SUM(monto_total) AS total_compras FROM Compras WHERE fecha_compra BETWEEN ? AND ?;', [q, q1]);
+            montototall = montototal[0].total_compras.toFixed(2);
         } else {
             // Si no se proporcionan ambas fechas, muestra todas las compras
             query = 'SELECT * FROM Compras ORDER BY fecha_compra DESC';
@@ -31,7 +32,7 @@ router.get('/', isLoggedInAdmin, async (req, res) => {
             element.monto_total = parseFloat(element.monto_total).toFixed(2);
         });
 
-        res.render('compras/listC', { compras, q, q1 });
+        res.render('compras/listC', { compras, q, q1, montototall });
     } catch (error) {
         console.error('Error al obtener las compras:', error);
         res.status(500).send('Error interno del servidor');
