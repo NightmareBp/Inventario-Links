@@ -14,7 +14,11 @@ router.get('/', async (req, res) => {
         if (q && q1) {
             queryParams.push(q, q1);
             montototal = await pool.query('SELECT SUM(monto_total) AS total_ventas FROM Ventas WHERE fecha_venta BETWEEN ? AND ?;', [q, q1]);
-            montototall = montototal[0].total_ventas.toFixed(2);
+            if (montototal[0].total_ventas !== null) {
+                montototall = montototal[0].total_ventas.toFixed(2);
+            } else {
+                montototall = '';
+            }
         } else {
             // Si no se proporcionan ambas fechas, muestra todas las compras
             query = 'SELECT * FROM Ventas ORDER BY fecha_venta DESC';
