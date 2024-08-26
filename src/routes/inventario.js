@@ -108,17 +108,23 @@ router.get('/', isLoggedIn, async (req, res) => {
     verificarFechas();
     verificarExistencias();
     try {
-        let query = 'SELECT p.*, pp.precio_compra, pp.precio_venta, pp.id_unidad, u.nombre AS nombre_unidad FROM Productos p LEFT JOIN Precios_productos pp ON p.id_producto = pp.id_producto LEFT JOIN Unidades u ON pp.id_unidad = u.id_unidad';
+        let query = `SELECT p.*, pp.precio_compra, pp.precio_venta, pp.id_unidad, u.nombre AS nombre_unidad
+                        FROM Productos p
+                        LEFT JOIN Precios_productos pp ON p.id_producto = pp.id_producto
+                        LEFT JOIN Unidades u ON pp.id_unidad = u.id_unidad`;
 
         const { q } = req.query;
         const queryParams = [];
 
         if (q) {
-            query += ' WHERE nombre_producto LIKE ?';
-            queryParams.push(`%${q}%`);
+            query += ' WHERE nombre_producto LIKE ? OR codigo_barras LIKE ?';
+            queryParams.push(`%${q}%`, `%${q}%`);
         }
+
         query += ' ORDER BY nombre_producto ASC';
+
         const productos = await pool.query(query, queryParams);
+
         // Obtener inventario total y fechas de vencimiento por producto
         const inventarios = await pool.query('SELECT id_producto, SUM(inventario) AS inventario_total FROM Fechas_vencimiento GROUP BY id_producto');
         const fechasVencimiento = await pool.query('SELECT id_producto, fecha_vencimiento, inventario FROM Fechas_vencimiento ORDER BY fecha_vencimiento ASC;');
@@ -133,16 +139,14 @@ router.get('/', isLoggedIn, async (req, res) => {
             if (!acc[id_producto]) {
                 acc[id_producto] = [];
             }
-            if (fecha_vencimiento !== null) {
-                acc[id_producto].push({
-                    fecha_vencimiento: new Date(fecha_vencimiento).toLocaleDateString('es-ES', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric'
-                    }),
-                    inventario
-                });
-            }
+            acc[id_producto].push({
+                fecha_vencimiento: fecha_vencimiento ? new Date(fecha_vencimiento).toLocaleDateString('es-ES', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                }) : 'Sin fecha de vencimiento',
+                inventario
+            });
             return acc;
         }, {});
 
@@ -165,16 +169,9 @@ router.get('/', isLoggedIn, async (req, res) => {
 
         res.render('productos/listA', {
             productos: Object.values(productosConPrecios).sort((a, b) => {
-                // Comparar los nombres de los productos para ordenar alfabéticamente
                 const nombreA = a.nombre_producto.toUpperCase();
                 const nombreB = b.nombre_producto.toUpperCase();
-                if (nombreA < nombreB) {
-                    return -1;
-                }
-                if (nombreA > nombreB) {
-                    return 1;
-                }
-                return 0; // Los nombres son iguales
+                return nombreA.localeCompare(nombreB);
             })
         });
     } catch (error) {
@@ -195,15 +192,30 @@ router.post('/add', isLoggedInAdmin, upload.single('imagen'), async (req, res) =
         let preciosVenta = req.body.precioVenta.map(precio => parseFloat(precio.trim() || 0));
         let preciosCompra = req.body.precioCompra.map(precio => parseFloat(precio.trim() || 0));
         let unidades = req.body.unidad;
+        let codigosBarras = req.body.codigo_barras.map(codigo => codigo.trim() !== '' ? codigo.trim() : null);
         let cantidadesinicial = req.body.cantidadinicial.map(cantidad => parseInt(cantidad.trim() || 0));
         let fechasvencimiento = req.body.fechavencimiento.map(fecha => fecha.trim() || null);
         anos = anos.trim() !== '' ? parseInt(anos) : 0;
         meses = meses.trim() !== '' ? parseInt(meses) : 0;
         dias = dias.trim() !== '' ? parseInt(dias) : 0;
+
         if (productoExistente.length > 0) {
             req.flash('message', 'Ya existe un producto con el mismo nombre.');
             return res.redirect('/inventario/add');
         }
+
+        // Verificación de códigos de barras duplicados en la tabla Precios_productos
+        for (let i = 0; i < codigosBarras.length; i++) {
+            if (codigosBarras[i]) {
+                const codigoExistente = await pool.query('SELECT * FROM Precios_productos WHERE codigo_barras = ?', [codigosBarras[i]]);
+                if (codigoExistente.length > 0) {
+                    req.flash('message', `El código de barras ${codigosBarras[i]} ya está registrado.`);
+                    return res.redirect('/inventario/add');
+                }
+            }
+        }
+
+        // Verificación de fechas de vencimiento duplicadas y otros checks
         for (let i = 0; i < cantidadesinicial.length; i++) {
             const fechavencimiento = fechasvencimiento[i];
             for (let j = i + 1; j < cantidadesinicial.length; j++) {
@@ -213,25 +225,29 @@ router.post('/add', isLoggedInAdmin, upload.single('imagen'), async (req, res) =
                 }
             }
         }
+
+        // Validación de cantidades iniciales y precios
         for (let i = 0; i < cantidadesinicial.length; i++) {
-            const cantidad = parseFloat(cantidadesinicial[i]); // Convertir el valor de cantidad a decimal
-            if (isNaN(cantidad) || cantidad < 0) { // Verificar si el valor no es un número o es menor o igual a cero
+            const cantidad = parseFloat(cantidadesinicial[i]);
+            if (isNaN(cantidad) || cantidad < 0) {
                 req.flash('message', 'Por favor, ingrese cantidades válidas como números decimales.');
                 return res.redirect('/inventario/add');
             }
         }
         for (let i = 0; i < preciosCompra.length; i++) {
-            const preciocompra = parseFloat(preciosCompra[i]); // Convertir el valor de cantidad a decimal
-            if (isNaN(preciocompra) || preciocompra < 0) { // Verificar si el valor no es un número o es menor o igual a cero
-                req.flash('message', 'Por favor, ingrese precios válidos como números decimales.');
+            const preciocompra = parseFloat(preciosCompra[i]);
+            const precioventa = parseFloat(preciosVenta[i]);
+            if (isNaN(preciocompra) || preciocompra < 0) {
+                req.flash('message', 'Por favor, ingrese precios de compra válidos.');
                 return res.redirect('/inventario/add');
             }
-            const precioventa = parseFloat(preciosVenta[i]);
-            if (isNaN(precioventa) || precioventa < 0) { // Verificar si el valor no es un número o es menor o igual a cero
-                req.flash('message', 'Por favor, ingrese precios válidos como números decimales.');
+            if (isNaN(precioventa) || precioventa < 0) {
+                req.flash('message', 'Por favor, ingrese precios de venta válidos.');
                 return res.redirect('/inventario/add');
             }
         }
+
+        // Verificación de unidades duplicadas
         for (let i = 0; i < unidades.length; i++) {
             const unidad = unidades[i];
             for (let j = i + 1; j < unidades.length; j++) {
@@ -241,30 +257,35 @@ router.post('/add', isLoggedInAdmin, upload.single('imagen'), async (req, res) =
                 }
             }
         }
-        const fechanoti = (anos || meses || dias) ? (365 * anos + 30 * meses + dias) : null; // Si no hay años, meses o días, fechanoti será null
+
+        // Cálculo de fecha de notificación y estado del producto
+        const fechanoti = (anos || meses || dias) ? (365 * anos + 30 * meses + dias) : null;
         const inventarioTotal = calcularInventarioTotal(cantidadesinicial);
         const estado = calcularEstadoProducto(inventarioTotal, cantidadlimite);
 
-        // Insertar el producto en la base de datos
+        // Inserción del producto
         const result = await pool.query('INSERT INTO Productos SET ?', {
             nombre_producto: nombre,
             cantidad_limite: cantidadlimite,
             fecha_notificacion: fechanoti,
-            estado_producto: estado
+            estado_producto: estado,
         });
 
         const productoid = result.insertId;
 
+        // Inserción de precios y códigos de barras asociados
         for (let i = 0; i < unidades.length; i++) {
             const nuevoprecio = {
                 precio_compra: preciosCompra[i],
                 precio_venta: preciosVenta[i],
                 id_producto: productoid,
                 id_unidad: unidades[i],
+                codigo_barras: codigosBarras[i] // Incluyendo el código de barras
             };
             await pool.query('INSERT INTO Precios_productos SET ?', nuevoprecio);
         }
 
+        // Inserción de inventario inicial
         for (let i = 0; i < cantidadesinicial.length; i++) {
             const nuevafecha = {
                 fecha_vencimiento: fechasvencimiento[i],
@@ -344,24 +365,29 @@ router.post('/edit/:id', isLoggedInAdmin, upload.single('imagen'), async (req, r
         anos = anos ? anos : 0;
         meses = meses ? meses : 0;
         dias = dias ? dias : 0;
+
         if (productoExistente.length > 0) {
             req.flash('message', 'Ya existe un producto con el mismo nombre.');
             return res.redirect('/inventario/edit/' + id);
         }
+
         let fechanoti = parseInt(365 * anos) + parseInt(30 * meses) + parseInt(dias);
         if (fechanoti === 0) {
             fechanoti = null;
         }
+
         const nuevolink = {
             nombre_producto: nombre,
             cantidad_limite: cantidadlimite,
-            fecha_notificacion: fechanoti,
+            fecha_notificacion: fechanoti
         };
+
         await pool.query('UPDATE Productos SET ? WHERE id_producto = ?', [nuevolink, id]);
+
         const inventarios = await pool.query('SELECT * FROM Fechas_vencimiento WHERE id_producto = ?', [id]);
         let inventariototalp = 0;
         for (let i = 0; i < inventarios.length; i++) {
-            inventariototalp = inventariototalp + inventarios[i].inventario;
+            inventariototalp += inventarios[i].inventario;
         }
         const datoproductocantidadlimite = await pool.query('SELECT * FROM Productos WHERE id_producto = ?', [id]);
         const productocantidadlimite = datoproductocantidadlimite[0].cantidad_limite;
@@ -376,7 +402,6 @@ router.post('/edit/:id', isLoggedInAdmin, upload.single('imagen'), async (req, r
         req.flash('success', 'Producto Editado Correctamente');
         res.redirect('/inventario');
     } catch (error) {
-        const { id } = req.params;
         console.error('Error al editar el producto:', error);
         req.flash('message', 'Error interno del servidor.');
         res.redirect('/inventario/edit/' + id);
@@ -385,25 +410,40 @@ router.post('/edit/:id', isLoggedInAdmin, upload.single('imagen'), async (req, r
 
 router.post('/editarprecios/:id', isLoggedInAdmin, async (req, res) => {
     const { id } = req.params;
-    const { unidad, precio_compra, precio_venta } = req.body;
+    const { unidad, precio_compra, precio_venta, codigo_barras } = req.body;
     const precioCompraDecimal = precio_compra ? parseFloat(precio_compra) : 0;
     const precioVentaDecimal = precio_venta ? parseFloat(precio_venta) : 0;
+    const codigoBarrasTrimmed = codigo_barras && codigo_barras.trim() !== '' ? codigo_barras.trim() : null;
+
     const resultado = await pool.query('SELECT * FROM Precios_productos WHERE id_precio = ?', [id]);
+
     if (isNaN(precioCompraDecimal) || precioCompraDecimal < 0 ||
         isNaN(precioVentaDecimal) || precioVentaDecimal < 0) {
         req.flash('message', 'Por favor, ingrese precios de compra y venta válidos como números decimales.');
         return res.redirect('/inventario/edit/' + resultado[0].id_producto);
     }
+
+    if (codigoBarrasTrimmed) {
+        const codigoExistente = await pool.query('SELECT * FROM Precios_productos WHERE codigo_barras = ? AND id_precio <> ?', [codigoBarrasTrimmed, id]);
+        if (codigoExistente.length > 0) {
+            req.flash('message', `El código de barras ${codigoBarrasTrimmed} ya está registrado.`);
+            return res.redirect('/inventario/edit/' + resultado[0].id_producto);
+        }
+    }
+
     let unidadexistente = await pool.query('SELECT * FROM Precios_productos WHERE id_producto = ? and id_unidad = ? AND id_precio <> ?', [resultado[0].id_producto, unidad, id]);
     if (unidadexistente.length > 0) {
         req.flash('message', 'Ya existe esta unidad registrada en el producto');
         return res.redirect('/inventario/edit/' + resultado[0].id_producto);
     }
+
     const nuevolink = {
         precio_compra: precioCompraDecimal,
         precio_venta: precioVentaDecimal,
-        id_unidad: unidad
+        id_unidad: unidad,
+        codigo_barras: codigoBarrasTrimmed
     };
+
     await pool.query('UPDATE Precios_productos SET ? WHERE id_precio = ?', [nuevolink, id]);
     req.flash('success', 'Precios Actualizados Correctamente');
     res.redirect('/inventario/edit/' + resultado[0].id_producto);
@@ -499,15 +539,24 @@ router.get('/eliminarinventario/:id', isLoggedInAdmin, async (req, res) => {
 
 router.post('/anadirprecios/:id', isLoggedInAdmin, async (req, res) => {
     const { id } = req.params;
-    const { unidad, precio_compra, precio_venta } = req.body;
+    const { unidad, precio_compra, precio_venta, codigo_barras } = req.body;
 
     // Validar que los precios de compra y venta sean números decimales válidos
     const precioCompraDecimal = precio_compra ? parseFloat(precio_compra) : 0;
     const precioVentaDecimal = precio_venta ? parseFloat(precio_venta) : 0;
+    const codigoBarrasTrimmed = codigo_barras && codigo_barras.trim() !== '' ? codigo_barras.trim() : null;
 
     if (isNaN(precioCompraDecimal) || isNaN(precioVentaDecimal) || precioCompraDecimal < 0 || precioVentaDecimal < 0) {
         req.flash('message', 'Por favor, ingrese precios de compra y venta válidos como números decimales mayores o iguales que cero.');
         return res.redirect('/inventario/edit/' + id);
+    }
+
+    if (codigoBarrasTrimmed) {
+        const codigoExistente = await pool.query('SELECT * FROM Precios_productos WHERE codigo_barras = ?', [codigoBarrasTrimmed]);
+        if (codigoExistente.length > 0) {
+            req.flash('message', `El código de barras ${codigoBarrasTrimmed} ya está registrado.`);
+            return res.redirect('/inventario/edit/' + id);
+        }
     }
 
     let unidadexistente = await pool.query('SELECT * FROM Precios_productos WHERE id_producto = ? and id_unidad = ?', [id, unidad]);
@@ -520,7 +569,8 @@ router.post('/anadirprecios/:id', isLoggedInAdmin, async (req, res) => {
         precio_compra: precioCompraDecimal,
         precio_venta: precioVentaDecimal,
         id_producto: id,
-        id_unidad: unidad
+        id_unidad: unidad,
+        codigo_barras: codigoBarrasTrimmed
     };
 
     await pool.query('INSERT INTO Precios_productos SET ?', nuevolink);

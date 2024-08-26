@@ -27,24 +27,31 @@
                         <div class="card-body border mb-3">
                             <h5 class="mb-3" style="text-align: center;">Precios de Compra y Venta</h5>
                             <div id="precios">
-                                <div class="input-group mb-3">
-                                    <span class="input-group-text">Precio de Venta</span>
-                                    <input type="text" class="form-control" name="precioVenta[]" aria-label="Server"
-                                        min="0">
-                                    <span class="input-group-text">Precio de Compra</span>
-                                    <input type="text" class="form-control" name="precioCompra[]" aria-label="Server"
-                                        min="0">
-                                    <span class="input-group-text">Unidad</span>
-                                    <select id="tiposelect" name="unidad[]" class="form-select form-select-sm"
-                                        aria-label=".form-select-sm example" required>
-                                        <option value="">Seleccione la Unidad</option>
-                                        {{#each unidades}}
-                                        <option value="{{id_unidad}}">{{nombre}} ({{cantidad}})</option>
-                                        {{else}}
-                                        <option value="1">No hay nada para mostrar</option>
-                                        {{/each}}
-                                    </select>
-                                    <button type="button" class="btn btn-outline-primary addPrecioBtn">+</button>
+                                <div>
+                                    <div class="input-group mb-2">
+                                        <span class="input-group-text">Precio de Venta</span>
+                                        <input type="text" class="form-control" name="precioVenta[]" aria-label="Server"
+                                            min="0">
+                                        <span class="input-group-text">Precio de Compra</span>
+                                        <input type="text" class="form-control" name="precioCompra[]"
+                                            aria-label="Server" min="0">
+                                    </div>
+                                    <div class="input-group mb-3">
+                                        <span class="input-group-text">Unidad</span>
+                                        <select id="tiposelect" name="unidad[]" class="form-select form-select-sm"
+                                            aria-label=".form-select-sm example" required>
+                                            <option value="">Seleccione la Unidad</option>
+                                            {{#each unidades}}
+                                            <option value="{{id_unidad}}">{{nombre}} ({{cantidad}})</option>
+                                            {{else}}
+                                            <option value="1">No hay nada para mostrar</option>
+                                            {{/each}}
+                                        </select>
+                                        <span class="input-group-text">Código de Barras</span>
+                                        <input type="text" class="form-control" name="codigo_barras[]"
+                                            placeholder="Opcional">
+                                        <button type="button" class="btn btn-outline-primary addPrecioBtn">+</button>
+                                    </div>
                                 </div>
                             </div>
                             <a href="/inventario/unidades" class="btn btn-outline-primary">Editar Unidades</a>
@@ -54,8 +61,8 @@
                             <div id="inventario">
                                 <div class="input-group mb-3">
                                     <span class="input-group-text">Cantidad</span>
-                                    <input type="text" class="form-control" name="cantidadinicial[]"
-                                        aria-label="Server" min="0" required>
+                                    <input type="text" class="form-control" name="cantidadinicial[]" aria-label="Server"
+                                        min="0" required>
                                     <span class="input-group-text">Fecha de vencimiento</span>
                                     <input type="date" class="form-control" name="fechavencimiento[]"
                                         aria-label="Server" min="0">
@@ -75,6 +82,14 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        const form = document.querySelector('form[action="/inventario/add"]');
+
+        form.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') {
+                event.preventDefault(); // Prevenir que el formulario se envíe al presionar Enter
+            }
+        });
+
         document.querySelectorAll('.addPrecioBtn').forEach(btn => {
             btn.addEventListener('click', addPrecio);
         });
@@ -85,30 +100,39 @@
 
         function addPrecio() {
             const precioGroup = document.createElement('div');
-            precioGroup.classList.add('input-group', 'mb-3');
+            precioGroup.classList.add('precio-group', 'mb-3'); // Añadir una clase para facilitar la eliminación
             precioGroup.innerHTML = `
+            <div class="input-group mb-2">
                 <span class="input-group-text">Precio de Venta</span>
                 <input type="text" class="form-control" name="precioVenta[]" aria-label="Server" min="0">
                 <span class="input-group-text">Precio de Compra</span>
                 <input type="text" class="form-control" name="precioCompra[]" aria-label="Server" min="0">
+            </div>
+            <div class="input-group mb-3">
                 <span class="input-group-text">Unidad</span>
-                <select id="tiposelect" name="unidad[]" class="form-select form-select-sm"
-                                        aria-label=".form-select-sm example" required>
-                                        <option value="">Seleccione la Unidad</option>
-                                        {{#each unidades}}
-                                        <option value="{{id_unidad}}">{{nombre}} ({{cantidad}})</option>
-                                        {{else}}
-                                        <option value="1">No hay nada para mostrar</option>
-                                        {{/each}}
-                                    </select>
+                <select id="tiposelect" name="unidad[]" class="form-select form-select-sm" aria-label=".form-select-sm example" required>
+                    <option value="">Seleccione la Unidad</option>
+                    {{#each unidades}}
+                    <option value="{{id_unidad}}">{{nombre}} ({{cantidad}})</option>
+                    {{else}}
+                    <option value="1">No hay nada para mostrar</option>
+                    {{/each}}
+                </select>
+                <span class="input-group-text">Código de Barras</span>
+                <input type="text" class="form-control" name="codigo_barras[]" placeholder="Opcional">
                 <button type="button" class="btn btn-outline-danger removeElementBtn">-</button>
-            `;
+            </div>
+        `;
             document.getElementById('precios').appendChild(precioGroup);
+
+            // Añadir event listener al nuevo botón de eliminación
             precioGroup.querySelector('.removeElementBtn').addEventListener('click', removeElement);
+
+            // Añadir event listener al nuevo botón de añadir precio
+            precioGroup.querySelector('.addPrecioBtn').addEventListener('click', addPrecio);
         }
 
         function addInventario() {
-            console.log("Añadiendo inventario...");
             const inventarioGroup = document.createElement('div');
             inventarioGroup.classList.add('input-group', 'mb-3');
             inventarioGroup.innerHTML = `
@@ -119,11 +143,20 @@
             <button type="button" class="btn btn-outline-danger removeElementBtn">-</button>
         `;
             document.getElementById('inventario').appendChild(inventarioGroup);
+
+            // Añadir event listener al nuevo botón de eliminación
             inventarioGroup.querySelector('.removeElementBtn').addEventListener('click', removeElement);
         }
 
         function removeElement(event) {
-            event.target.parentNode.remove();
+            const buttonClicked = event.target;
+            const parentGroup = buttonClicked.closest('.precio-group');
+            if (parentGroup) {
+                parentGroup.remove(); // Elimina todo el grupo de precios, unidad y código de barras
+            } else {
+                // Para elementos de inventario
+                buttonClicked.closest('.input-group').remove();
+            }
         }
     });
 </script>

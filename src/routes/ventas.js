@@ -9,7 +9,7 @@ router.get('/', async (req, res) => {
     try {
         const { q, q1 } = req.query;
         const queryParams = [];
-        let query = 'SELECT * FROM Ventas WHERE fecha_venta BETWEEN ? AND ? ORDER BY fecha_venta DESC';
+        let query = 'SELECT * FROM Ventas WHERE fecha_venta BETWEEN ? AND ? ORDER BY fecha_venta DESC, id_venta DESC';
         let montototall = null;
         if (q && q1) {
             queryParams.push(q, q1);
@@ -21,7 +21,7 @@ router.get('/', async (req, res) => {
             }
         } else {
             // Si no se proporcionan ambas fechas, muestra todas las compras
-            query = 'SELECT * FROM Ventas ORDER BY fecha_venta DESC';
+            query = 'SELECT * FROM Ventas ORDER BY fecha_venta DESC, id_venta DESC';
         }
 
         const ventas = await pool.query(query, queryParams);
@@ -214,6 +214,38 @@ router.post('/add', isLoggedIn, async (req, res) => {
     }
 });
 
+router.get('/productos/barcode/:barcode', isLoggedIn, async (req, res) => {
+    try {
+        const { barcode } = req.params;
+
+        // Consulta para obtener el producto y su unidad por código de barras
+        const producto = await pool.query(`
+            SELECT pp.id_precio, pp.precio_venta, pp.precio_compra, u.nombre AS nombre_unidad, p.id_producto, p.nombre_producto, fv.inventario_total
+            FROM Precios_productos pp
+            INNER JOIN Unidades u ON pp.id_unidad = u.id_unidad
+            INNER JOIN Productos p ON pp.id_producto = p.id_producto
+            LEFT JOIN (
+                SELECT id_producto, SUM(inventario) AS inventario_total
+                FROM Fechas_vencimiento
+                GROUP BY id_producto
+            ) fv ON p.id_producto = fv.id_producto
+            WHERE pp.codigo_barras = ? LIMIT 1`, [barcode]);
+
+        if (producto.length === 0) {
+            return res.status(404).json({ error: 'Producto no encontrado' });
+        }
+
+        // Verificar si el producto tiene un precio de venta registrado
+        if (!producto[0].precio_venta || producto[0].precio_venta <= 0) {
+            return res.status(400).json({ error: 'El producto no tiene un precio de venta válido' });
+        }
+
+        res.json(producto[0]); // Devolver el producto encontrado
+    } catch (error) {
+        console.error('Error al obtener el producto por código de barras:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
 // Código del servidor para generar el PDF de la cotización
 
 router.post('/cotizacion', async (req, res) => {
