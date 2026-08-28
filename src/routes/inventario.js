@@ -1,695 +1,3936 @@
 const express = require('express');
 const router = express.Router();
+
 const pool = require('../database');
-const { isLoggedInAdmin } = require('../lib/auth');
-const { isLoggedIn } = require('../lib/auth');
+
+const {
+    isLoggedIn,
+    isLoggedInAdmin
+} = require('../lib/auth');
+
 const multer = require('multer');
-const fs = require('fs');
+
+
+/* =========================================================
+   CONFIGURACIÓN DE ARCHIVOS
+========================================================= */
+
 const storage = multer.diskStorage({
+
     destination: function (req, file, cb) {
-        cb(null, 'src/public/uploads/') // Aquí indicas la carpeta donde se guardarán las imágenes
+
+        cb(
+            null,
+            'src/public/uploads/'
+        );
+
     },
+
     filename: function (req, file, cb) {
-        cb(null, file.originalname)
+
+        cb(
+            null,
+            file.originalname
+        );
+
     }
+
 });
-const upload = multer({ storage: storage });
+
+
+const upload = multer({
+    storage
+});
+
+
+/* =========================================================
+   UTILIDADES
+========================================================= */
+
+function normalizarArray(valor) {
+
+    if (Array.isArray(valor)) {
+        return valor;
+    }
+
+    if (
+        valor === undefined ||
+        valor === null
+    ) {
+        return [];
+    }
+
+    return [valor];
+
+}
+
+
+function calcularEstadoProducto(
+    inventarioTotal,
+    cantidadLimite
+) {
+
+    const inventario =
+        Number(inventarioTotal) || 0;
+
+
+    const limite =
+        Number(cantidadLimite) || 0;
+
+
+    if (inventario <= 0) {
+
+        return 3;
+
+    }
+
+
+    if (inventario <= limite) {
+
+        return 2;
+
+    }
+
+
+    return 1;
+
+}
+
+
+async function actualizarEstadoProducto(
+    idProducto
+) {
+
+    const resultado =
+        await pool.query(`
+            SELECT
+                p.id_producto,
+                p.cantidad_limite,
+
+                COALESCE(
+                    SUM(fv.inventario),
+                    0
+                ) AS inventario_total
+
+            FROM Productos p
+
+            LEFT JOIN Fechas_vencimiento fv
+                ON fv.id_producto =
+                   p.id_producto
+
+            WHERE
+                p.id_producto = ?
+
+            GROUP BY
+                p.id_producto,
+                p.cantidad_limite
+        `, [
+            idProducto
+        ]);
+
+
+    if (
+        resultado.length === 0
+    ) {
+
+        return;
+
+    }
+
+
+    const estado =
+        calcularEstadoProducto(
+            resultado[0].inventario_total,
+            resultado[0].cantidad_limite
+        );
+
+
+    await pool.query(`
+        UPDATE Productos
+
+        SET
+            estado_producto = ?
+
+        WHERE
+            id_producto = ?
+    `, [
+        estado,
+        idProducto
+    ]);
+
+
+    /*
+     * Si el producto cambia de estado,
+     * eliminamos notificaciones de existencias
+     * que ya dejaron de tener sentido.
+     */
+
+    if (estado === 1) {
+
+        await pool.query(`
+            DELETE FROM Notificaciones
+
+            WHERE
+                id_producto = ?
+
+                AND
+                existencias IN (2, 3)
+        `, [
+            idProducto
+        ]);
+
+    }
+
+    else if (estado === 2) {
+
+        await pool.query(`
+            DELETE FROM Notificaciones
+
+            WHERE
+                id_producto = ?
+
+                AND
+                existencias = 3
+        `, [
+            idProducto
+        ]);
+
+    }
+
+    else {
+
+        await pool.query(`
+            DELETE FROM Notificaciones
+
+            WHERE
+                id_producto = ?
+
+                AND
+                existencias = 2
+        `, [
+            idProducto
+        ]);
+
+    }
+
+}
+
+
+/* =========================================================
+   NOTIFICACIONES
+========================================================= */
+
+/*
+ * Evitamos volver a recorrer todos los productos
+ * cada vez que el buscador AJAX consulta el inventario.
+ */
+
+let ultimaVerificacionNotificaciones = 0;
+
+
+const INTERVALO_VERIFICACION =
+    5 * 60 * 1000;
+
+
 
 async function verificarFechas() {
+
     try {
-        const fechas = await pool.query('SELECT * FROM Fechas_vencimiento WHERE fecha_vencimiento IS NOT NULL;');
-        const fechaActual = new Date();
-        fechas.forEach(async (fecha) => {
-            const diffTiempo = fecha.fecha_vencimiento.getTime() - fechaActual.getTime();
-            const diffDias = Math.ceil(diffTiempo / (1000 * 3600 * 24));
-            const datosProducto = await pool.query('SELECT * FROM Productos WHERE id_producto = ?;', [fecha.id_producto]);
-            if (diffDias <= datosProducto[0].fecha_notificacion) {
-                const mensaje = `El producto ${datosProducto[0].nombre_producto} está por vencerse en ${diffDias} días.`;
-                const usuarios = await pool.query('SELECT * FROM usuarios');
-                for (let i = 0; i < usuarios.length; i++) {
-                    const nuevanoti = {
-                        contenido: mensaje,
-                        estado: 1,
-                        id_usuario: usuarios[i].id_usuario,
-                        id_producto: fecha.id_producto,
-                        id_fecha_vencimiento: fecha.id_fechavencimiento,
-                        fecha_vencimiento: fecha.fecha_vencimiento,
-                        fecha_noti: fechaActual,
-                        existencias: null,
-                    };
-                    const existeNotificacion = await pool.query('SELECT * FROM Notificaciones WHERE fecha_vencimiento = ? AND id_usuario = ? AND id_producto = ?', [fecha.fecha_vencimiento, usuarios[i].id_usuario, fecha.id_producto]);
-                    if (existeNotificacion.length === 0) {
-                        await pool.query('INSERT INTO Notificaciones SET ?', nuevanoti);
-                        console.log(`Notificación generada para ${datosProducto[0].nombre_producto}: ${mensaje}`);
-                    }
-                }
+
+        const fechas =
+            await pool.query(`
+                SELECT
+                    fv.id_fechavencimiento,
+                    fv.id_producto,
+                    fv.fecha_vencimiento,
+
+                    p.nombre_producto,
+                    p.fecha_notificacion
+
+                FROM Fechas_vencimiento fv
+
+                INNER JOIN Productos p
+                    ON p.id_producto =
+                       fv.id_producto
+
+                WHERE
+                    fv.fecha_vencimiento
+                        IS NOT NULL
+
+                    AND
+
+                    p.fecha_notificacion
+                        IS NOT NULL
+            `);
+
+
+        if (
+            fechas.length === 0
+        ) {
+
+            return;
+
+        }
+
+
+        const usuarios =
+            await pool.query(`
+                SELECT
+                    id_usuario
+
+                FROM usuarios
+            `);
+
+
+        const fechaActual =
+            new Date();
+
+
+        for (
+            const fecha
+            of fechas
+        ) {
+
+            const fechaVencimiento =
+                new Date(
+                    fecha.fecha_vencimiento
+                );
+
+
+            const diffTiempo =
+                fechaVencimiento.getTime() -
+                fechaActual.getTime();
+
+
+            const diffDias =
+                Math.ceil(
+                    diffTiempo /
+                    (
+                        1000 *
+                        60 *
+                        60 *
+                        24
+                    )
+                );
+
+
+            if (
+                diffDias >
+                Number(
+                    fecha.fecha_notificacion
+                )
+            ) {
+
+                continue;
+
             }
-        });
+
+
+            let mensaje;
+
+
+            if (diffDias < 0) {
+
+                mensaje =
+                    `El producto ${fecha.nombre_producto} tiene un lote vencido.`;
+
+            }
+
+            else if (diffDias === 0) {
+
+                mensaje =
+                    `El producto ${fecha.nombre_producto} vence hoy.`;
+
+            }
+
+            else {
+
+                mensaje =
+                    `El producto ${fecha.nombre_producto} está por vencerse en ${diffDias} días.`;
+
+            }
+
+
+            for (
+                const usuario
+                of usuarios
+            ) {
+
+                const existente =
+                    await pool.query(`
+                        SELECT
+                            id_notificacion
+
+                        FROM Notificaciones
+
+                        WHERE
+                            id_fecha_vencimiento = ?
+
+                            AND
+                            id_usuario = ?
+
+                        LIMIT 1
+                    `, [
+                        fecha.id_fechavencimiento,
+                        usuario.id_usuario
+                    ]);
+
+
+                if (
+                    existente.length > 0
+                ) {
+
+                    continue;
+
+                }
+
+
+                await pool.query(
+                    `
+                        INSERT INTO Notificaciones
+                        SET ?
+                    `,
+                    {
+                        contenido:
+                            mensaje,
+
+                        estado:
+                            1,
+
+                        id_usuario:
+                            usuario.id_usuario,
+
+                        id_producto:
+                            fecha.id_producto,
+
+                        id_fecha_vencimiento:
+                            fecha.id_fechavencimiento,
+
+                        fecha_vencimiento:
+                            fecha.fecha_vencimiento,
+
+                        fecha_noti:
+                            fechaActual,
+
+                        existencias:
+                            null
+                    }
+                );
+
+            }
+
+        }
+
+
     } catch (error) {
-        console.error('Error al verificar fechas de vencimiento:', error);
+
+        console.error(
+            'Error al verificar fechas de vencimiento:',
+            error
+        );
+
     }
+
 }
+
+
 
 async function verificarExistencias() {
+
     try {
-        const productos = await pool.query('SELECT * FROM Productos');
-        const fechaActual = new Date();
-        productos.forEach(async (producto) => {
-            const estadoproducto = producto.estado_producto;
-            if (estadoproducto === 1) {
-            } else if (estadoproducto === 2) {
-                const mensaje = `El producto ${producto.nombre_producto} cuenta con bajas existencias`;
-                const usuarios = await pool.query('SELECT * FROM usuarios');
-                for (let i = 0; i < usuarios.length; i++) {
-                    const nuevanoti = {
-                        contenido: mensaje,
-                        estado: 1,
-                        id_usuario: usuarios[i].id_usuario,
-                        id_producto: producto.id_producto,
-                        id_fecha_vencimiento: null,
-                        fecha_vencimiento: null,
-                        fecha_noti: fechaActual,
-                        existencias: 2,
-                    };
-                    const existeNotificacion = await pool.query('SELECT * FROM Notificaciones WHERE existencias = 2 AND id_usuario = ? AND id_producto = ?', [usuarios[i].id_usuario, producto.id_producto]);
-                    if (existeNotificacion.length === 0) {
-                        await pool.query('INSERT INTO Notificaciones SET ?', nuevanoti);
-                        console.log(`Notificación generada para ${producto.nombre_producto}: ${mensaje}`);
+
+        const productos =
+            await pool.query(`
+                SELECT
+                    id_producto,
+                    nombre_producto,
+                    estado_producto
+
+                FROM Productos
+
+                WHERE
+                    estado_producto
+                    IN (2, 3)
+            `);
+
+
+        if (
+            productos.length === 0
+        ) {
+
+            return;
+
+        }
+
+
+        const usuarios =
+            await pool.query(`
+                SELECT
+                    id_usuario
+
+                FROM usuarios
+            `);
+
+
+        const fechaActual =
+            new Date();
+
+
+        for (
+            const producto
+            of productos
+        ) {
+
+            const tipoExistencia =
+                producto.estado_producto;
+
+
+            const mensaje =
+                tipoExistencia === 2
+
+                    ? `El producto ${producto.nombre_producto} cuenta con bajas existencias`
+
+                    : `El producto ${producto.nombre_producto} se ha agotado`;
+
+
+            for (
+                const usuario
+                of usuarios
+            ) {
+
+                const existente =
+                    await pool.query(`
+                        SELECT
+                            id_notificacion
+
+                        FROM Notificaciones
+
+                        WHERE
+                            existencias = ?
+
+                            AND
+                            id_usuario = ?
+
+                            AND
+                            id_producto = ?
+
+                        LIMIT 1
+                    `, [
+                        tipoExistencia,
+                        usuario.id_usuario,
+                        producto.id_producto
+                    ]);
+
+
+                if (
+                    existente.length > 0
+                ) {
+
+                    continue;
+
+                }
+
+
+                await pool.query(
+                    `
+                        INSERT INTO Notificaciones
+                        SET ?
+                    `,
+                    {
+                        contenido:
+                            mensaje,
+
+                        estado:
+                            1,
+
+                        id_usuario:
+                            usuario.id_usuario,
+
+                        id_producto:
+                            producto.id_producto,
+
+                        id_fecha_vencimiento:
+                            null,
+
+                        fecha_vencimiento:
+                            null,
+
+                        fecha_noti:
+                            fechaActual,
+
+                        existencias:
+                            tipoExistencia
                     }
-                }
-            } else if (estadoproducto === 3) {
-                const mensaje = `El producto ${producto.nombre_producto} se ha agotado`;
-                const usuarios = await pool.query('SELECT * FROM usuarios');
-                for (let i = 0; i < usuarios.length; i++) {
-                    const nuevanoti = {
-                        contenido: mensaje,
-                        estado: 1,
-                        id_usuario: usuarios[i].id_usuario,
-                        id_producto: producto.id_producto,
-                        id_fecha_vencimiento: null,
-                        fecha_vencimiento: null,
-                        fecha_noti: fechaActual,
-                        existencias: 3,
-                    };
-                    const existeNotificacion = await pool.query('SELECT * FROM Notificaciones WHERE existencias = 3 AND id_usuario = ? AND id_producto = ?', [usuarios[i].id_usuario, producto.id_producto]);
-                    if (existeNotificacion.length === 0) {
-                        await pool.query('INSERT INTO Notificaciones SET ?', nuevanoti);
-                        console.log(`Notificación generada para ${producto.nombre_producto}: ${mensaje}`);
-                    }
-                }
+                );
+
             }
-        });
+
+        }
+
+
     } catch (error) {
-        console.error('Error al verificar fechas de vencimiento:', error);
+
+        console.error(
+            'Error al verificar existencias:',
+            error
+        );
+
     }
+
 }
 
-router.get('/', isLoggedIn, async (req, res) => {
-    verificarFechas();
-    verificarExistencias();
-    try {
-        let query = `SELECT p.*, pp.precio_compra, pp.precio_venta, pp.id_unidad, u.nombre AS nombre_unidad
-                        FROM Productos p
-                        LEFT JOIN Precios_productos pp ON p.id_producto = pp.id_producto
-                        LEFT JOIN Unidades u ON pp.id_unidad = u.id_unidad`;
 
-        const { q } = req.query;
-        const queryParams = [];
 
-        if (q) {
-            query += ' WHERE nombre_producto LIKE ? OR codigo_barras LIKE ?';
-            queryParams.push(`%${q}%`, `%${q}%`);
-        }
+function ejecutarVerificacionesSiCorresponde() {
 
-        query += ' ORDER BY nombre_producto ASC';
+    const ahora =
+        Date.now();
 
-        const productos = await pool.query(query, queryParams);
 
-        // Obtener inventario total y fechas de vencimiento por producto
-        const inventarios = await pool.query('SELECT id_producto, SUM(inventario) AS inventario_total FROM Fechas_vencimiento GROUP BY id_producto');
-        const fechasVencimiento = await pool.query('SELECT id_producto, fecha_vencimiento, inventario FROM Fechas_vencimiento ORDER BY fecha_vencimiento ASC;');
+    if (
+        ahora -
+        ultimaVerificacionNotificaciones
+        <
+        INTERVALO_VERIFICACION
+    ) {
 
-        // Convertir resultados a objeto para facilitar el acceso
-        const inventarioTotalPorProducto = inventarios.reduce((acc, { id_producto, inventario_total }) => {
-            acc[id_producto] = inventario_total;
-            return acc;
-        }, {});
+        return;
 
-        const fechasVencimientoPorProducto = fechasVencimiento.reduce((acc, { id_producto, fecha_vencimiento, inventario }) => {
-            if (!acc[id_producto]) {
-                acc[id_producto] = [];
-            }
-            acc[id_producto].push({
-                fecha_vencimiento: fecha_vencimiento ? new Date(fecha_vencimiento).toLocaleDateString('es-ES', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric'
-                }) : 'Sin fecha de vencimiento',
-                inventario
-            });
-            return acc;
-        }, {});
-
-        // Agrupar los precios y el inventario por producto
-        const productosConPrecios = productos.reduce((acc, producto) => {
-            const idProducto = producto.id_producto;
-            if (!acc[idProducto]) {
-                acc[idProducto] = { ...producto, preciosventa: [], precioscompra: [], inventarioTotal: 0, fechasVencimiento: [] };
-            }
-            if (producto.precio_venta && producto.id_unidad) {
-                acc[idProducto].preciosventa.push({ precio_venta: producto.precio_venta, unidad: producto.nombre_unidad });
-            }
-            if (producto.precio_compra && producto.id_unidad) {
-                acc[idProducto].precioscompra.push({ precio_compra: producto.precio_compra, unidad: producto.nombre_unidad });
-            }
-            acc[idProducto].inventarioTotal = inventarioTotalPorProducto[idProducto] || 0;
-            acc[idProducto].fechasVencimiento = fechasVencimientoPorProducto[idProducto] || [];
-            return acc;
-        }, {});
-
-        res.render('productos/listA', {
-            productos: Object.values(productosConPrecios).sort((a, b) => {
-                const nombreA = a.nombre_producto.toUpperCase();
-                const nombreB = b.nombre_producto.toUpperCase();
-                return nombreA.localeCompare(nombreB);
-            })
-        });
-    } catch (error) {
-        console.error('Error al obtener los productos:', error);
-        res.status(500).send('Error interno del servidor');
     }
-});
 
-router.get('/add', isLoggedInAdmin, async (req, res) => {
-    const unidades = await pool.query('SELECT * FROM Unidades');
-    res.render('productos/add', { unidades });
-});
 
-router.post('/add', isLoggedInAdmin, upload.single('imagen'), async (req, res) => {
-    try {
-        let { nombre, cantidadlimite, anos, meses, dias } = req.body;
-        let productoExistente = await pool.query('SELECT * FROM Productos WHERE nombre_producto = ?', [nombre]);
-        let preciosVenta = req.body.precioVenta.map(precio => parseFloat(precio.trim() || 0));
-        let preciosCompra = req.body.precioCompra.map(precio => parseFloat(precio.trim() || 0));
-        let unidades = req.body.unidad;
-        let codigosBarras = req.body.codigo_barras.map(codigo => codigo.trim() !== '' ? codigo.trim() : null);
-        let cantidadesinicial = req.body.cantidadinicial.map(cantidad => parseInt(cantidad.trim() || 0));
-        let fechasvencimiento = req.body.fechavencimiento.map(fecha => fecha.trim() || null);
-        anos = anos.trim() !== '' ? parseInt(anos) : 0;
-        meses = meses.trim() !== '' ? parseInt(meses) : 0;
-        dias = dias.trim() !== '' ? parseInt(dias) : 0;
+    ultimaVerificacionNotificaciones =
+        ahora;
 
-        if (productoExistente.length > 0) {
-            req.flash('message', 'Ya existe un producto con el mismo nombre.');
-            return res.redirect('/inventario/add');
-        }
 
-        // Verificación de códigos de barras duplicados en la tabla Precios_productos
-        for (let i = 0; i < codigosBarras.length; i++) {
-            if (codigosBarras[i]) {
-                const codigoExistente = await pool.query('SELECT * FROM Precios_productos WHERE codigo_barras = ?', [codigosBarras[i]]);
-                if (codigoExistente.length > 0) {
-                    req.flash('message', `El código de barras ${codigosBarras[i]} ya está registrado.`);
-                    return res.redirect('/inventario/add');
-                }
+    Promise
+        .all([
+            verificarFechas(),
+            verificarExistencias()
+        ])
+        .catch(
+            error => {
+
+                console.error(
+                    'Error ejecutando verificaciones:',
+                    error
+                );
+
             }
-        }
+        );
 
-        // Verificación de fechas de vencimiento duplicadas y otros checks
-        for (let i = 0; i < cantidadesinicial.length; i++) {
-            const fechavencimiento = fechasvencimiento[i];
-            for (let j = i + 1; j < cantidadesinicial.length; j++) {
-                if (fechavencimiento === fechasvencimiento[j]) {
-                    req.flash('message', 'Existen fechas de vencimiento duplicadas');
-                    return res.redirect('/inventario/add');
-                }
-            }
-        }
-
-        // Validación de cantidades iniciales y precios
-        for (let i = 0; i < cantidadesinicial.length; i++) {
-            const cantidad = parseFloat(cantidadesinicial[i]);
-            if (isNaN(cantidad) || cantidad < 0) {
-                req.flash('message', 'Por favor, ingrese cantidades válidas como números decimales.');
-                return res.redirect('/inventario/add');
-            }
-        }
-        for (let i = 0; i < preciosCompra.length; i++) {
-            const preciocompra = parseFloat(preciosCompra[i]);
-            const precioventa = parseFloat(preciosVenta[i]);
-            if (isNaN(preciocompra) || preciocompra < 0) {
-                req.flash('message', 'Por favor, ingrese precios de compra válidos.');
-                return res.redirect('/inventario/add');
-            }
-            if (isNaN(precioventa) || precioventa < 0) {
-                req.flash('message', 'Por favor, ingrese precios de venta válidos.');
-                return res.redirect('/inventario/add');
-            }
-        }
-
-        // Verificación de unidades duplicadas
-        for (let i = 0; i < unidades.length; i++) {
-            const unidad = unidades[i];
-            for (let j = i + 1; j < unidades.length; j++) {
-                if (unidad === unidades[j]) {
-                    req.flash('message', 'Existen unidades duplicadas');
-                    return res.redirect('/inventario/add');
-                }
-            }
-        }
-
-        // Cálculo de fecha de notificación y estado del producto
-        const fechanoti = (anos || meses || dias) ? (365 * anos + 30 * meses + dias) : null;
-        const inventarioTotal = calcularInventarioTotal(cantidadesinicial);
-        const estado = calcularEstadoProducto(inventarioTotal, cantidadlimite);
-
-        // Inserción del producto
-        const result = await pool.query('INSERT INTO Productos SET ?', {
-            nombre_producto: nombre,
-            cantidad_limite: cantidadlimite,
-            fecha_notificacion: fechanoti,
-            estado_producto: estado,
-        });
-
-        const productoid = result.insertId;
-
-        // Inserción de precios y códigos de barras asociados
-        for (let i = 0; i < unidades.length; i++) {
-            const nuevoprecio = {
-                precio_compra: preciosCompra[i],
-                precio_venta: preciosVenta[i],
-                id_producto: productoid,
-                id_unidad: unidades[i],
-                codigo_barras: codigosBarras[i] // Incluyendo el código de barras
-            };
-            await pool.query('INSERT INTO Precios_productos SET ?', nuevoprecio);
-        }
-
-        // Inserción de inventario inicial
-        for (let i = 0; i < cantidadesinicial.length; i++) {
-            const nuevafecha = {
-                fecha_vencimiento: fechasvencimiento[i],
-                inventario: cantidadesinicial[i],
-                id_producto: productoid,
-            };
-            await pool.query('INSERT INTO Fechas_vencimiento SET ?', nuevafecha);
-        }
-
-        // Redirigir al usuario después de agregar el producto
-        req.flash('success', 'Producto agregado correctamente');
-        res.redirect('/inventario');
-    } catch (error) {
-        console.error('Error al agregar el producto:', error);
-        req.flash('message', 'Error interno del servidor.');
-        res.redirect('/inventario/add');
-    }
-});
-
-function calcularInventarioTotal(cantidadesinicial) {
-    let inventarioTotal = 0;
-    for (let i = 0; i < cantidadesinicial.length; i++) {
-        inventarioTotal = inventarioTotal + cantidadesinicial[i]
-    }
-    return inventarioTotal;
 }
 
-function calcularEstadoProducto(inventarioTotal, cantidadlimite) {
-    let estado = 1;
-    if (inventarioTotal === 0) {
-        estado = 3;
-    } else if (inventarioTotal <= cantidadlimite) {
-        estado = 2;
+
+
+/* =========================================================
+   OBTENER INVENTARIO PAGINADO
+========================================================= */
+
+/*
+ * IMPORTANTE:
+ *
+ * La paginación se realiza primero sobre PRODUCTOS.
+ *
+ * No hacemos LIMIT directamente sobre:
+ *
+ * Productos JOIN Precios_productos
+ *
+ * porque un mismo producto puede tener varias unidades
+ * y ocuparía varias posiciones de la página.
+ */
+
+async function obtenerInventarioPaginado({
+
+    termino = '',
+    pagina = 1,
+    limite = 20,
+    esAdmin = false
+
+}) {
+
+    const q =
+        String(
+            termino || ''
+        ).trim();
+
+
+    const page =
+        Math.max(
+            1,
+            Number.parseInt(
+                pagina,
+                10
+            ) || 1
+        );
+
+
+    const pageSize =
+        Math.min(
+            50,
+            Math.max(
+                10,
+                Number.parseInt(
+                    limite,
+                    10
+                ) || 20
+            )
+        );
+
+
+    const whereParams = [];
+
+    let where = '';
+
+
+    /*
+     * Permitimos buscar tanto por nombre
+     * como por código de barras.
+     */
+
+    if (q) {
+
+        const contiene =
+            `%${q}%`;
+
+
+        where = `
+            WHERE
+                p.nombre_producto LIKE ?
+
+                OR
+
+                EXISTS (
+
+                    SELECT 1
+
+                    FROM Precios_productos pb
+
+                    WHERE
+                        pb.id_producto =
+                            p.id_producto
+
+                        AND
+                        pb.codigo_barras
+                            LIKE ?
+                )
+        `;
+
+
+        whereParams.push(
+            contiene,
+            contiene
+        );
+
     }
-    return estado;
-}
 
-router.get('/edit/:id', isLoggedInAdmin, async (req, res) => {
-    const { id } = req.params;
-    const productos = await pool.query('SELECT * FROM Productos WHERE id_producto = ?', [id]);
-    const precios = await pool.query('SELECT precios.*, Unidades.nombre AS nombre_unidad '
-        + 'FROM Precios_productos AS precios '
-        + 'JOIN Unidades ON precios.id_unidad = Unidades.id_unidad '
-        + 'WHERE precios.id_producto = ?', [id]);
-    const unidades = await pool.query('SELECT * FROM Unidades');
-    let fechasvencimiento = await pool.query('SELECT * FROM Fechas_vencimiento WHERE id_producto = ?', [id]);
 
-    // Formatear la fecha de vencimiento
-    for (let i = 0; i < fechasvencimiento.length; i++) {
-        let fechaVencimiento = new Date(fechasvencimiento[i].fecha_vencimiento);
-        let fechaFormateada = fechaVencimiento.toLocaleDateString('es-ES', { year: 'numeric', month: '2-digit', day: '2-digit' });
-        fechasvencimiento[i].fecha_vencimientoFormateada = fechaFormateada;
+    /* =====================================================
+       TOTAL DE PRODUCTOS
+    ====================================================== */
+
+    const totalResultado =
+        await pool.query(
+            `
+                SELECT
+                    COUNT(*) AS total
+
+                FROM Productos p
+
+                ${where}
+            `,
+            whereParams
+        );
+
+
+    const total =
+        Number(
+            totalResultado[0].total
+        ) || 0;
+
+
+    const totalPaginas =
+        Math.max(
+            1,
+            Math.ceil(
+                total /
+                pageSize
+            )
+        );
+
+
+    const paginaActual =
+        Math.min(
+            page,
+            totalPaginas
+        );
+
+
+    const offset =
+        (
+            paginaActual -
+            1
+        ) *
+        pageSize;
+
+
+
+    /* =====================================================
+       ORDEN
+    ====================================================== */
+
+    const orderParams = [];
+
+    let orderBy =
+        `
+            ORDER BY
+                p.nombre_producto ASC
+        `;
+
+
+    /*
+     * Si se escanea un código exacto,
+     * ese producto aparece primero.
+     */
+
+    if (q) {
+
+        orderBy = `
+            ORDER BY
+
+                CASE
+
+                    WHEN EXISTS (
+
+                        SELECT 1
+
+                        FROM Precios_productos pe
+
+                        WHERE
+                            pe.id_producto =
+                                p.id_producto
+
+                            AND
+                            pe.codigo_barras = ?
+
+                    )
+                    THEN 0
+
+
+                    WHEN
+                        p.nombre_producto LIKE ?
+
+                    THEN 1
+
+
+                    ELSE 2
+
+                END,
+
+                p.nombre_producto ASC
+        `;
+
+
+        orderParams.push(
+            q,
+            `${q}%`
+        );
+
     }
-    var fechaBaseDatos = new Date();
-    fechasvencimiento.forEach((element) => {
-        fechaBaseDatos = element.fecha_vencimiento;
-        if (fechaBaseDatos) {
-            element.fecha_vencimiento = fechaBaseDatos.toISOString().split('T')[0];
-        } else {
-            element.fecha_vencimiento = ''; // o cualquier otro valor predeterminado si es null
-        }
-    })
-    // Calcular años, meses y días
-    const cantidadDias = productos[0].fecha_notificacion;
-    const anos = Math.floor(cantidadDias / 365);
-    const meses = Math.floor((cantidadDias - 365 * anos) / 30);
-    const dias = cantidadDias - 365 * anos - meses * 30;
 
-    res.render('productos/edit', { producto: productos[0], precios, unidades, fechasvencimiento, anos, meses, dias });
-});
 
-router.post('/edit/:id', isLoggedInAdmin, upload.single('imagen'), async (req, res) => {
-    try {
-        const { id } = req.params;
-        let { nombre, cantidadlimite, anos, meses, dias } = req.body;
-        let productoExistente = await pool.query('SELECT * FROM Productos WHERE nombre_producto = ? AND id_producto <> ?', [nombre, id]);
-        anos = anos ? anos : 0;
-        meses = meses ? meses : 0;
-        dias = dias ? dias : 0;
 
-        if (productoExistente.length > 0) {
-            req.flash('message', 'Ya existe un producto con el mismo nombre.');
-            return res.redirect('/inventario/edit/' + id);
-        }
+    /* =====================================================
+       OBTENER IDS DE LOS PRODUCTOS DE ESTA PÁGINA
+    ====================================================== */
 
-        let fechanoti = parseInt(365 * anos) + parseInt(30 * meses) + parseInt(dias);
-        if (fechanoti === 0) {
-            fechanoti = null;
-        }
+    const idsResultado =
+        await pool.query(
+            `
+                SELECT
+                    p.id_producto
 
-        const nuevolink = {
-            nombre_producto: nombre,
-            cantidad_limite: cantidadlimite,
-            fecha_notificacion: fechanoti
+                FROM Productos p
+
+                ${where}
+
+                ${orderBy}
+
+                LIMIT ?
+                OFFSET ?
+            `,
+            [
+                ...whereParams,
+                ...orderParams,
+                pageSize,
+                offset
+            ]
+        );
+
+
+    const ids =
+        idsResultado.map(
+            fila =>
+                Number(
+                    fila.id_producto
+                )
+        );
+
+
+    if (
+        ids.length === 0
+    ) {
+
+        return {
+
+            productos: [],
+
+            paginacion: {
+
+                pagina:
+                    paginaActual,
+
+                limite:
+                    pageSize,
+
+                total,
+
+                totalPaginas,
+
+                desde:
+                    0,
+
+                hasta:
+                    0,
+
+                tieneAnterior:
+                    paginaActual > 1,
+
+                tieneSiguiente:
+                    paginaActual <
+                    totalPaginas
+
+            }
+
         };
 
-        await pool.query('UPDATE Productos SET ? WHERE id_producto = ?', [nuevolink, id]);
+    }
 
-        const inventarios = await pool.query('SELECT * FROM Fechas_vencimiento WHERE id_producto = ?', [id]);
-        let inventariototalp = 0;
-        for (let i = 0; i < inventarios.length; i++) {
-            inventariototalp += inventarios[i].inventario;
+
+
+    /* =====================================================
+       DATOS PRINCIPALES
+    ====================================================== */
+
+    const productosBase =
+        await pool.query(`
+            SELECT
+                p.id_producto,
+                p.nombre_producto,
+                p.cantidad_limite,
+                p.fecha_notificacion,
+                p.estado_producto,
+
+                COALESCE(
+                    inv.inventario_total,
+                    0
+                ) AS inventarioTotal
+
+
+            FROM Productos p
+
+
+            LEFT JOIN (
+
+                SELECT
+                    id_producto,
+
+                    SUM(inventario)
+                        AS inventario_total
+
+                FROM Fechas_vencimiento
+
+                GROUP BY
+                    id_producto
+
+            ) inv
+
+                ON inv.id_producto =
+                   p.id_producto
+
+
+            WHERE
+                p.id_producto IN (?)
+        `, [
+            ids
+        ]);
+
+
+
+    /* =====================================================
+       PRECIOS
+    ====================================================== */
+
+    /*
+     * Para usuarios normales ni siquiera enviamos
+     * precio_compra al navegador.
+     */
+
+    let precios;
+
+
+    if (esAdmin) {
+
+        precios =
+            await pool.query(`
+                SELECT
+                    pp.id_precio,
+                    pp.id_producto,
+                    pp.precio_compra,
+                    pp.precio_venta,
+                    pp.codigo_barras,
+
+                    u.nombre
+                        AS unidad
+
+                FROM Precios_productos pp
+
+                INNER JOIN Unidades u
+                    ON u.id_unidad =
+                       pp.id_unidad
+
+                WHERE
+                    pp.id_producto
+                    IN (?)
+
+                ORDER BY
+                    u.nombre ASC
+            `, [
+                ids
+            ]);
+
+    }
+
+    else {
+
+        precios =
+            await pool.query(`
+                SELECT
+                    pp.id_precio,
+                    pp.id_producto,
+                    pp.precio_venta,
+                    pp.codigo_barras,
+
+                    u.nombre
+                        AS unidad
+
+                FROM Precios_productos pp
+
+                INNER JOIN Unidades u
+                    ON u.id_unidad =
+                       pp.id_unidad
+
+                WHERE
+                    pp.id_producto
+                    IN (?)
+
+                ORDER BY
+                    u.nombre ASC
+            `, [
+                ids
+            ]);
+
+    }
+
+
+
+    /* =====================================================
+       LOTES
+    ====================================================== */
+
+    const lotes =
+        await pool.query(`
+            SELECT
+                id_producto,
+                inventario,
+
+                CASE
+
+                    WHEN
+                        fecha_vencimiento
+                        IS NULL
+
+                    THEN
+                        NULL
+
+
+                    ELSE
+                        DATE_FORMAT(
+                            fecha_vencimiento,
+                            '%d/%m/%Y'
+                        )
+
+                END
+                    AS fecha_vencimiento
+
+            FROM Fechas_vencimiento
+
+            WHERE
+                id_producto
+                IN (?)
+
+            ORDER BY
+
+                fecha_vencimiento
+                    IS NULL ASC,
+
+                fecha_vencimiento ASC
+        `, [
+            ids
+        ]);
+
+
+
+    /* =====================================================
+       AGRUPAR PRODUCTOS
+    ====================================================== */
+
+    const mapaProductos =
+        new Map();
+
+
+    for (
+        const producto
+        of productosBase
+    ) {
+
+        mapaProductos.set(
+
+            Number(
+                producto.id_producto
+            ),
+
+            {
+
+                ...producto,
+
+                inventarioTotal:
+                    Number(
+                        producto.inventarioTotal
+                    ) || 0,
+
+                preciosventa: [],
+
+                precioscompra: [],
+
+                fechasVencimiento: []
+
+            }
+
+        );
+
+    }
+
+
+
+    /* =====================================================
+       AGRUPAR PRECIOS
+    ====================================================== */
+
+    for (
+        const precio
+        of precios
+    ) {
+
+        const producto =
+            mapaProductos.get(
+                Number(
+                    precio.id_producto
+                )
+            );
+
+
+        if (!producto) {
+
+            continue;
+
         }
-        const datoproductocantidadlimite = await pool.query('SELECT * FROM Productos WHERE id_producto = ?', [id]);
-        const productocantidadlimite = datoproductocantidadlimite[0].cantidad_limite;
-        let nuevoestadoproducto = 1;
-        if (inventariototalp <= productocantidadlimite) {
-            nuevoestadoproducto = 2;
+
+
+        if (
+            precio.precio_venta !== null &&
+            Number(
+                precio.precio_venta
+            ) > 0
+        ) {
+
+            producto
+                .preciosventa
+                .push({
+
+                    id_precio:
+                        precio.id_precio,
+
+                    precio_venta:
+                        Number(
+                            precio.precio_venta
+                        ),
+
+                    unidad:
+                        precio.unidad,
+
+                    codigo_barras:
+                        precio.codigo_barras ||
+                        null
+
+                });
+
         }
-        if (inventariototalp === 0) {
-            nuevoestadoproducto = 3;
+
+
+        if (
+            esAdmin &&
+            precio.precio_compra !== null &&
+            Number(
+                precio.precio_compra
+            ) > 0
+        ) {
+
+            producto
+                .precioscompra
+                .push({
+
+                    id_precio:
+                        precio.id_precio,
+
+                    precio_compra:
+                        Number(
+                            precio.precio_compra
+                        ),
+
+                    unidad:
+                        precio.unidad,
+
+                    codigo_barras:
+                        precio.codigo_barras ||
+                        null
+
+                });
+
         }
-        await pool.query('Update Productos set estado_producto = ? WHERE id_producto = ?', [nuevoestadoproducto, id]);
-        req.flash('success', 'Producto Editado Correctamente');
-        res.redirect('/inventario');
-    } catch (error) {
-        console.error('Error al editar el producto:', error);
-        req.flash('message', 'Error interno del servidor.');
-        res.redirect('/inventario/edit/' + id);
-    }
-});
 
-router.post('/editarprecios/:id', isLoggedInAdmin, async (req, res) => {
-    const { id } = req.params;
-    const { unidad, precio_compra, precio_venta, codigo_barras } = req.body;
-    const precioCompraDecimal = precio_compra ? parseFloat(precio_compra) : 0;
-    const precioVentaDecimal = precio_venta ? parseFloat(precio_venta) : 0;
-    const codigoBarrasTrimmed = codigo_barras && codigo_barras.trim() !== '' ? codigo_barras.trim() : null;
-
-    const resultado = await pool.query('SELECT * FROM Precios_productos WHERE id_precio = ?', [id]);
-
-    if (isNaN(precioCompraDecimal) || precioCompraDecimal < 0 ||
-        isNaN(precioVentaDecimal) || precioVentaDecimal < 0) {
-        req.flash('message', 'Por favor, ingrese precios de compra y venta válidos como números decimales.');
-        return res.redirect('/inventario/edit/' + resultado[0].id_producto);
     }
 
-    if (codigoBarrasTrimmed) {
-        const codigoExistente = await pool.query('SELECT * FROM Precios_productos WHERE codigo_barras = ? AND id_precio <> ?', [codigoBarrasTrimmed, id]);
-        if (codigoExistente.length > 0) {
-            req.flash('message', `El código de barras ${codigoBarrasTrimmed} ya está registrado.`);
-            return res.redirect('/inventario/edit/' + resultado[0].id_producto);
+
+
+    /* =====================================================
+       AGRUPAR LOTES
+    ====================================================== */
+
+    for (
+        const lote
+        of lotes
+    ) {
+
+        const producto =
+            mapaProductos.get(
+                Number(
+                    lote.id_producto
+                )
+            );
+
+
+        if (!producto) {
+
+            continue;
+
         }
+
+
+        producto
+            .fechasVencimiento
+            .push({
+
+                inventario:
+                    Number(
+                        lote.inventario
+                    ) || 0,
+
+                fecha_vencimiento:
+                    lote.fecha_vencimiento ||
+                    'Sin fecha de vencimiento'
+
+            });
+
     }
 
-    let unidadexistente = await pool.query('SELECT * FROM Precios_productos WHERE id_producto = ? and id_unidad = ? AND id_precio <> ?', [resultado[0].id_producto, unidad, id]);
-    if (unidadexistente.length > 0) {
-        req.flash('message', 'Ya existe esta unidad registrada en el producto');
-        return res.redirect('/inventario/edit/' + resultado[0].id_producto);
-    }
 
-    const nuevolink = {
-        precio_compra: precioCompraDecimal,
-        precio_venta: precioVentaDecimal,
-        id_unidad: unidad,
-        codigo_barras: codigoBarrasTrimmed
-    };
 
-    await pool.query('UPDATE Precios_productos SET ? WHERE id_precio = ?', [nuevolink, id]);
-    req.flash('success', 'Precios Actualizados Correctamente');
-    res.redirect('/inventario/edit/' + resultado[0].id_producto);
-});
+    /*
+     * Respetamos el orden obtenido
+     * por la primera consulta.
+     */
 
-router.post('/editarinventarios/:id', isLoggedInAdmin, async (req, res) => {
-    const { id } = req.params;
-    const { inventario, fechavencimiento } = req.body;
+    const productos =
+        ids
+            .map(
+                id =>
+                    mapaProductos.get(id)
+            )
+            .filter(Boolean);
 
-    // Validar que el inventario sea un número decimal válido
-    const inventarioDecimal = inventario ? parseFloat(inventario) : 0;
-    const resultado = await pool.query('SELECT * FROM Fechas_vencimiento WHERE id_fechavencimiento = ?', [id]);
-    if (isNaN(inventarioDecimal) || inventarioDecimal < 0) {
-        req.flash('message', 'Por favor, ingrese un inventario válido como número decimal mayor o igual que cero.');
-        return res.redirect('/inventario/edit/' + resultado[0].id_producto);
-    }
 
-    // Verificar si la fecha de vencimiento está vacía
-    const fechaVencimiento = fechavencimiento ? fechavencimiento : null;
 
-    let fechaexistente;
-    if (fechaVencimiento !== null) {
-        fechaexistente = await pool.query('SELECT * FROM Fechas_vencimiento WHERE id_producto = ? AND fecha_vencimiento = ? AND id_fechavencimiento <> ?', [resultado[0].id_producto, fechaVencimiento, id]);
-    } else {
-        fechaexistente = await pool.query('SELECT * FROM Fechas_vencimiento WHERE id_producto = ? AND fecha_vencimiento IS NULL AND id_fechavencimiento <> ?', [resultado[0].id_producto, id]);
-    }
+    return {
 
-    if (fechaexistente.length > 0) {
-        req.flash('message', 'Ya existe esta fecha de vencimiento registrada en el producto');
-        return res.redirect('/inventario/edit/' + resultado[0].id_producto);
-    }
+        productos,
 
-    const nuevolink = {
-        fecha_vencimiento: fechaVencimiento,
-        inventario: inventarioDecimal,
-    };
+        paginacion: {
 
-    await pool.query('UPDATE Fechas_vencimiento SET ? WHERE id_fechavencimiento = ?', [nuevolink, id]);
+            pagina:
+                paginaActual,
 
-    const inventarios = await pool.query('SELECT * FROM Fechas_vencimiento WHERE id_producto = ?', [resultado[0].id_producto]);
-    let inventariototalp = 0;
-    for (let i = 0; i < inventarios.length; i++) {
-        inventariototalp = inventariototalp + inventarios[i].inventario;
-    }
+            limite:
+                pageSize,
 
-    const datoproductocantidadlimite = await pool.query('SELECT * FROM Productos WHERE id_producto = ?', [resultado[0].id_producto]);
-    const productocantidadlimite = datoproductocantidadlimite[0].cantidad_limite;
-    let nuevoestadoproducto = 1;
-    if (inventariototalp <= productocantidadlimite) {
-        nuevoestadoproducto = 2;
-    }
-    if (inventariototalp === 0) {
-        nuevoestadoproducto = 3;
-    }
+            total,
 
-    await pool.query('Update Productos set estado_producto = ? WHERE id_producto = ?', [nuevoestadoproducto, resultado[0].id_producto]);
+            totalPaginas,
 
-    req.flash('success', 'Inventario Actualizado Correctamente');
-    res.redirect('/inventario/edit/' + resultado[0].id_producto);
-});
+            desde:
+                total === 0
+                    ? 0
+                    : offset + 1,
 
-router.get('/eliminarprecio/:id', isLoggedInAdmin, async (req, res) => {
-    const { id } = req.params;
-    const resultado = await pool.query('Select * from Precios_productos WHERE id_precio = ?', [id]);
-    await pool.query('DELETE FROM Precios_productos WHERE id_precio = ?', [id]);
-    req.flash('noti', 'Precio Eliminado Correctamente');
-    res.redirect('/inventario/edit/' + resultado[0].id_producto);
-});
+            hasta:
+                Math.min(
+                    offset +
+                    pageSize,
+                    total
+                ),
 
-router.get('/eliminarinventario/:id', isLoggedInAdmin, async (req, res) => {
-    const { id } = req.params;
-    const resultado = await pool.query('Select * from Fechas_vencimiento WHERE id_fechavencimiento = ?', [id]);
-    await pool.query('DELETE FROM Notificaciones WHERE id_fecha_vencimiento = ?', [id]);
-    await pool.query('DELETE FROM Fechas_vencimiento WHERE id_fechavencimiento = ?', [id]);
-    const inventarios = await pool.query('SELECT * FROM Fechas_vencimiento WHERE id_producto = ?', [resultado[0].id_producto]);
-    let inventariototalp = 0;
-    for (let i = 0; i < inventarios.length; i++) {
-        inventariototalp = inventariototalp + inventarios[i].inventario;
-    }
-    const datoproductocantidadlimite = await pool.query('SELECT * FROM Productos WHERE id_producto = ?', [resultado[0].id_producto]);
-    const productocantidadlimite = datoproductocantidadlimite[0].cantidad_limite;
-    let nuevoestadoproducto = 1;
-    if (inventariototalp <= productocantidadlimite) {
-        nuevoestadoproducto = 2;
-    }
-    if (inventariototalp === 0) {
-        nuevoestadoproducto = 3;
-    }
-    await pool.query('Update Productos set estado_producto = ? WHERE id_producto = ?', [nuevoestadoproducto, resultado[0].id_producto]);
-    req.flash('noti', 'Inventario Eliminado Correctamente');
-    res.redirect('/inventario/edit/' + resultado[0].id_producto);
-});
+            tieneAnterior:
+                paginaActual > 1,
 
-router.post('/anadirprecios/:id', isLoggedInAdmin, async (req, res) => {
-    const { id } = req.params;
-    const { unidad, precio_compra, precio_venta, codigo_barras } = req.body;
+            tieneSiguiente:
+                paginaActual <
+                totalPaginas
 
-    // Validar que los precios de compra y venta sean números decimales válidos
-    const precioCompraDecimal = precio_compra ? parseFloat(precio_compra) : 0;
-    const precioVentaDecimal = precio_venta ? parseFloat(precio_venta) : 0;
-    const codigoBarrasTrimmed = codigo_barras && codigo_barras.trim() !== '' ? codigo_barras.trim() : null;
-
-    if (isNaN(precioCompraDecimal) || isNaN(precioVentaDecimal) || precioCompraDecimal < 0 || precioVentaDecimal < 0) {
-        req.flash('message', 'Por favor, ingrese precios de compra y venta válidos como números decimales mayores o iguales que cero.');
-        return res.redirect('/inventario/edit/' + id);
-    }
-
-    if (codigoBarrasTrimmed) {
-        const codigoExistente = await pool.query('SELECT * FROM Precios_productos WHERE codigo_barras = ?', [codigoBarrasTrimmed]);
-        if (codigoExistente.length > 0) {
-            req.flash('message', `El código de barras ${codigoBarrasTrimmed} ya está registrado.`);
-            return res.redirect('/inventario/edit/' + id);
         }
-    }
 
-    let unidadexistente = await pool.query('SELECT * FROM Precios_productos WHERE id_producto = ? and id_unidad = ?', [id, unidad]);
-    if (unidadexistente.length > 0) {
-        req.flash('message', 'Ya existe esta unidad registrada en el producto');
-        return res.redirect('/inventario/edit/' + id);
-    }
-
-    const nuevolink = {
-        precio_compra: precioCompraDecimal,
-        precio_venta: precioVentaDecimal,
-        id_producto: id,
-        id_unidad: unidad,
-        codigo_barras: codigoBarrasTrimmed
     };
 
-    await pool.query('INSERT INTO Precios_productos SET ?', nuevolink);
-    req.flash('success', 'Precio Agregado Correctamente');
-    res.redirect('/inventario/edit/' + id);
-});
+}
 
-router.post('/anadirinventarios/:id', isLoggedInAdmin, async (req, res) => {
-    const { id } = req.params;
-    const { inventario, fechavencimiento } = req.body;
 
-    // Validar que el inventario sea un número decimal válido
-    const inventarioDecimal = parseFloat(inventario);
 
-    if (isNaN(inventarioDecimal) || inventarioDecimal < 0) {
-        req.flash('message', 'Por favor, ingrese un inventario válido como número decimal mayor o igual que cero.');
-        return res.redirect('/inventario/edit/' + id);
+/* =========================================================
+   INVENTARIO PRINCIPAL
+========================================================= */
+
+router.get(
+    '/',
+    isLoggedIn,
+    async (req, res) => {
+
+        /*
+         * Las notificaciones se verifican
+         * como máximo una vez cada 5 minutos.
+         */
+
+        ejecutarVerificacionesSiCorresponde();
+
+
+        return res.render(
+            'productos/listA'
+        );
+
     }
+);
 
-    const fechaVencimiento = fechavencimiento ? fechavencimiento : null;
 
-    let fechaexistente;
-    if (fechaVencimiento !== null) {
-        fechaexistente = await pool.query('SELECT * FROM Fechas_vencimiento WHERE id_producto = ? AND fecha_vencimiento = ?', [id, fechaVencimiento]);
-    } else {
-        fechaexistente = await pool.query('SELECT * FROM Fechas_vencimiento WHERE id_producto = ? AND fecha_vencimiento IS NULL', [id]);
+
+/* =========================================================
+   API DE INVENTARIO
+   BÚSQUEDA + PAGINACIÓN
+========================================================= */
+
+router.get(
+    '/datos',
+    isLoggedIn,
+    async (req, res) => {
+
+        try {
+
+            const resultado =
+                await obtenerInventarioPaginado({
+
+                    termino:
+                        req.query.q,
+
+                    pagina:
+                        req.query.page,
+
+                    limite:
+                        20,
+
+                    esAdmin:
+                        Number(
+                            req.user.tipo
+                        ) === 1
+
+                });
+
+
+            return res.json({
+
+                ...resultado,
+
+                esAdmin:
+                    Number(
+                        req.user.tipo
+                    ) === 1
+
+            });
+
+
+        } catch (error) {
+
+            console.error(
+                'Error obteniendo inventario:',
+                error
+            );
+
+
+            return res
+                .status(500)
+                .json({
+
+                    error:
+                        'No se pudo cargar el inventario.'
+
+                });
+
+        }
+
     }
+);
 
-    if (fechaexistente.length > 0) {
-        req.flash('message', 'Ya existe esta fecha de vencimiento registrada en el producto');
-        return res.redirect('/inventario/edit/' + id);
+
+
+/* =========================================================
+   AGREGAR PRODUCTO
+========================================================= */
+
+router.get(
+    '/add',
+    isLoggedInAdmin,
+    async (req, res) => {
+
+        try {
+
+            const unidades =
+                await pool.query(`
+                    SELECT *
+                    FROM Unidades
+                    ORDER BY nombre ASC
+                `);
+
+
+            return res.render(
+                'productos/add',
+                {
+                    unidades
+                }
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                'Error cargando formulario de producto:',
+                error
+            );
+
+
+            req.flash(
+                'message',
+                'No se pudo cargar el formulario.'
+            );
+
+
+            return res.redirect(
+                '/inventario'
+            );
+
+        }
+
     }
+);
 
-    const nuevolink = {
-        fecha_vencimiento: fechaVencimiento,
-        inventario: inventarioDecimal,
-        id_producto: id
-    };
 
-    await pool.query('INSERT INTO Fechas_vencimiento SET ?', nuevolink);
 
-    const inventarios = await pool.query('SELECT * FROM Fechas_vencimiento WHERE id_producto = ?', [id]);
-    let inventariototalp = 0;
-    for (let i = 0; i < inventarios.length; i++) {
-        inventariototalp = inventariototalp + inventarios[i].inventario;
+router.post(
+    '/add',
+    isLoggedInAdmin,
+    upload.single('imagen'),
+    async (req, res) => {
+
+        try {
+
+            let {
+                nombre,
+                cantidadlimite,
+                anos,
+                meses,
+                dias
+            } = req.body;
+
+
+            nombre =
+                String(
+                    nombre || ''
+                ).trim();
+
+
+            if (!nombre) {
+
+                req.flash(
+                    'message',
+                    'Ingrese el nombre del producto.'
+                );
+
+
+                return res.redirect(
+                    '/inventario/add'
+                );
+
+            }
+
+
+
+            const productoExistente =
+                await pool.query(`
+                    SELECT
+                        id_producto
+
+                    FROM Productos
+
+                    WHERE
+                        nombre_producto = ?
+
+                    LIMIT 1
+                `, [
+                    nombre
+                ]);
+
+
+            if (
+                productoExistente.length > 0
+            ) {
+
+                req.flash(
+                    'message',
+                    'Ya existe un producto con el mismo nombre.'
+                );
+
+
+                return res.redirect(
+                    '/inventario/add'
+                );
+
+            }
+
+
+
+            const preciosVenta =
+                normalizarArray(
+                    req.body.precioVenta
+                ).map(
+                    valor =>
+                        Number(
+                            valor || 0
+                        )
+                );
+
+
+            const preciosCompra =
+                normalizarArray(
+                    req.body.precioCompra
+                ).map(
+                    valor =>
+                        Number(
+                            valor || 0
+                        )
+                );
+
+
+            const unidades =
+                normalizarArray(
+                    req.body.unidad
+                );
+
+
+            const codigosBarras =
+                normalizarArray(
+                    req.body.codigo_barras
+                ).map(
+                    valor => {
+
+                        const codigo =
+                            String(
+                                valor || ''
+                            ).trim();
+
+
+                        return codigo || null;
+
+                    }
+                );
+
+
+            const cantidadesIniciales =
+                normalizarArray(
+                    req.body.cantidadinicial
+                ).map(
+                    valor =>
+                        Number(
+                            valor || 0
+                        )
+                );
+
+
+            const fechasVencimiento =
+                normalizarArray(
+                    req.body.fechavencimiento
+                ).map(
+                    valor => {
+
+                        const fecha =
+                            String(
+                                valor || ''
+                            ).trim();
+
+
+                        return fecha || null;
+
+                    }
+                );
+
+
+
+            if (
+                unidades.length === 0 ||
+
+                preciosVenta.length !==
+                    unidades.length ||
+
+                preciosCompra.length !==
+                    unidades.length
+            ) {
+
+                req.flash(
+                    'message',
+                    'Los precios y unidades están incompletos.'
+                );
+
+
+                return res.redirect(
+                    '/inventario/add'
+                );
+
+            }
+
+
+
+            for (
+                const precio
+                of preciosCompra
+            ) {
+
+                if (
+                    !Number.isFinite(precio) ||
+                    precio < 0
+                ) {
+
+                    req.flash(
+                        'message',
+                        'Ingrese precios de compra válidos.'
+                    );
+
+
+                    return res.redirect(
+                        '/inventario/add'
+                    );
+
+                }
+
+            }
+
+
+
+            for (
+                const precio
+                of preciosVenta
+            ) {
+
+                if (
+                    !Number.isFinite(precio) ||
+                    precio < 0
+                ) {
+
+                    req.flash(
+                        'message',
+                        'Ingrese precios de venta válidos.'
+                    );
+
+
+                    return res.redirect(
+                        '/inventario/add'
+                    );
+
+                }
+
+            }
+
+
+
+            for (
+                const cantidad
+                of cantidadesIniciales
+            ) {
+
+                if (
+                    !Number.isFinite(cantidad) ||
+                    cantidad < 0
+                ) {
+
+                    req.flash(
+                        'message',
+                        'Ingrese cantidades iniciales válidas.'
+                    );
+
+
+                    return res.redirect(
+                        '/inventario/add'
+                    );
+
+                }
+
+            }
+
+
+
+            const unidadesUnicas =
+                new Set(
+                    unidades.map(
+                        String
+                    )
+                );
+
+
+            if (
+                unidadesUnicas.size !==
+                unidades.length
+            ) {
+
+                req.flash(
+                    'message',
+                    'Existen unidades duplicadas.'
+                );
+
+
+                return res.redirect(
+                    '/inventario/add'
+                );
+
+            }
+
+
+
+            const fechasNoNulas =
+                fechasVencimiento
+                    .filter(Boolean);
+
+
+            if (
+                new Set(
+                    fechasNoNulas
+                ).size
+                !==
+                fechasNoNulas.length
+            ) {
+
+                req.flash(
+                    'message',
+                    'Existen fechas de vencimiento duplicadas.'
+                );
+
+
+                return res.redirect(
+                    '/inventario/add'
+                );
+
+            }
+
+
+
+            for (
+                const codigo
+                of codigosBarras
+            ) {
+
+                if (!codigo) {
+
+                    continue;
+
+                }
+
+
+                const codigoExistente =
+                    await pool.query(`
+                        SELECT
+                            id_precio
+
+                        FROM Precios_productos
+
+                        WHERE
+                            codigo_barras = ?
+
+                        LIMIT 1
+                    `, [
+                        codigo
+                    ]);
+
+
+                if (
+                    codigoExistente.length > 0
+                ) {
+
+                    req.flash(
+                        'message',
+                        `El código de barras ${codigo} ya está registrado.`
+                    );
+
+
+                    return res.redirect(
+                        '/inventario/add'
+                    );
+
+                }
+
+            }
+
+
+
+            anos =
+                Number.parseInt(
+                    anos,
+                    10
+                ) || 0;
+
+
+            meses =
+                Number.parseInt(
+                    meses,
+                    10
+                ) || 0;
+
+
+            dias =
+                Number.parseInt(
+                    dias,
+                    10
+                ) || 0;
+
+
+
+            const fechaNotificacion =
+                anos ||
+                meses ||
+                dias
+
+                    ?
+                    (
+                        365 * anos
+                    ) +
+                    (
+                        30 * meses
+                    ) +
+                    dias
+
+                    :
+                    null;
+
+
+
+            const inventarioTotal =
+                cantidadesIniciales
+                    .reduce(
+                        (
+                            total,
+                            cantidad
+                        ) =>
+                            total +
+                            cantidad,
+                        0
+                    );
+
+
+            const cantidadLimite =
+                Number(
+                    cantidadlimite
+                ) || 0;
+
+
+            const estado =
+                calcularEstadoProducto(
+                    inventarioTotal,
+                    cantidadLimite
+                );
+
+
+
+            const resultadoProducto =
+                await pool.query(
+                    `
+                        INSERT INTO Productos
+                        SET ?
+                    `,
+                    {
+                        nombre_producto:
+                            nombre,
+
+                        cantidad_limite:
+                            cantidadLimite,
+
+                        fecha_notificacion:
+                            fechaNotificacion,
+
+                        estado_producto:
+                            estado
+                    }
+                );
+
+
+            const idProducto =
+                resultadoProducto.insertId;
+
+
+
+            /* =================================================
+               PRECIOS
+            ================================================= */
+
+            for (
+                let i = 0;
+                i < unidades.length;
+                i++
+            ) {
+
+                await pool.query(
+                    `
+                        INSERT INTO Precios_productos
+                        SET ?
+                    `,
+                    {
+                        precio_compra:
+                            preciosCompra[i],
+
+                        precio_venta:
+                            preciosVenta[i],
+
+                        id_producto:
+                            idProducto,
+
+                        id_unidad:
+                            unidades[i],
+
+                        codigo_barras:
+                            codigosBarras[i] ||
+                            null
+                    }
+                );
+
+            }
+
+
+
+            /* =================================================
+               INVENTARIO INICIAL
+            ================================================= */
+
+            for (
+                let i = 0;
+                i < cantidadesIniciales.length;
+                i++
+            ) {
+
+                await pool.query(
+                    `
+                        INSERT INTO Fechas_vencimiento
+                        SET ?
+                    `,
+                    {
+                        fecha_vencimiento:
+                            fechasVencimiento[i] ||
+                            null,
+
+                        inventario:
+                            cantidadesIniciales[i],
+
+                        id_producto:
+                            idProducto
+                    }
+                );
+
+            }
+
+
+
+            req.flash(
+                'success',
+                'Producto agregado correctamente.'
+            );
+
+
+            return res.redirect(
+                '/inventario'
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                'Error al agregar producto:',
+                error
+            );
+
+
+            req.flash(
+                'message',
+                'Error interno del servidor.'
+            );
+
+
+            return res.redirect(
+                '/inventario/add'
+            );
+
+        }
+
     }
+);
 
-    const datoproductocantidadlimite = await pool.query('SELECT * FROM Productos WHERE id_producto = ?', [id]);
-    const productocantidadlimite = datoproductocantidadlimite[0].cantidad_limite;
-    let nuevoestadoproducto = 1;
-    if (inventariototalp <= productocantidadlimite) {
-        nuevoestadoproducto = 2;
+
+
+/* =========================================================
+   EDITAR PRODUCTO
+========================================================= */
+
+router.get(
+    '/edit/:id',
+    isLoggedInAdmin,
+    async (req, res) => {
+
+        try {
+
+            const {
+                id
+            } = req.params;
+
+
+
+            const productos =
+                await pool.query(`
+                    SELECT *
+                    FROM Productos
+
+                    WHERE
+                        id_producto = ?
+
+                    LIMIT 1
+                `, [
+                    id
+                ]);
+
+
+            if (
+                productos.length === 0
+            ) {
+
+                req.flash(
+                    'message',
+                    'El producto no existe.'
+                );
+
+
+                return res.redirect(
+                    '/inventario'
+                );
+
+            }
+
+
+
+            const precios =
+                await pool.query(`
+                    SELECT
+                        pp.*,
+
+                        u.nombre
+                            AS nombre_unidad
+
+                    FROM Precios_productos pp
+
+                    INNER JOIN Unidades u
+                        ON u.id_unidad =
+                           pp.id_unidad
+
+                    WHERE
+                        pp.id_producto = ?
+
+                    ORDER BY
+                        u.nombre ASC
+                `, [
+                    id
+                ]);
+
+
+
+            const unidades =
+                await pool.query(`
+                    SELECT *
+                    FROM Unidades
+
+                    ORDER BY
+                        nombre ASC
+                `);
+
+
+
+            const fechasVencimiento =
+                await pool.query(`
+                    SELECT
+                        fv.*,
+
+
+                        CASE
+
+                            WHEN
+                                fv.fecha_vencimiento
+                                IS NULL
+
+                            THEN
+                                ''
+
+                            ELSE
+                                DATE_FORMAT(
+                                    fv.fecha_vencimiento,
+                                    '%Y-%m-%d'
+                                )
+
+                        END
+                            AS fecha_vencimiento,
+
+
+                        CASE
+
+                            WHEN
+                                fv.fecha_vencimiento
+                                IS NULL
+
+                            THEN
+                                'Sin fecha de vencimiento'
+
+                            ELSE
+                                DATE_FORMAT(
+                                    fv.fecha_vencimiento,
+                                    '%d/%m/%Y'
+                                )
+
+                        END
+                            AS fecha_vencimientoFormateada
+
+
+                    FROM Fechas_vencimiento fv
+
+                    WHERE
+                        fv.id_producto = ?
+
+                    ORDER BY
+
+                        fv.fecha_vencimiento
+                            IS NULL ASC,
+
+                        fv.fecha_vencimiento ASC
+                `, [
+                    id
+                ]);
+
+
+
+            const cantidadDias =
+                Number(
+                    productos[0]
+                        .fecha_notificacion
+                ) || 0;
+
+
+            const anos =
+                Math.floor(
+                    cantidadDias /
+                    365
+                );
+
+
+            const meses =
+                Math.floor(
+                    (
+                        cantidadDias -
+                        (
+                            365 *
+                            anos
+                        )
+                    ) /
+                    30
+                );
+
+
+            const dias =
+                cantidadDias -
+                (
+                    365 *
+                    anos
+                ) -
+                (
+                    30 *
+                    meses
+                );
+
+
+
+            return res.render(
+                'productos/edit',
+                {
+                    producto:
+                        productos[0],
+
+                    precios,
+
+                    unidades,
+
+                    fechasvencimiento:
+                        fechasVencimiento,
+
+                    anos,
+
+                    meses,
+
+                    dias
+                }
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                'Error cargando producto:',
+                error
+            );
+
+
+            req.flash(
+                'message',
+                'No se pudo cargar el producto.'
+            );
+
+
+            return res.redirect(
+                '/inventario'
+            );
+
+        }
+
     }
-    if (inventariototalp === 0) {
-        nuevoestadoproducto = 3;
+);
+
+
+
+router.post(
+    '/edit/:id',
+    isLoggedInAdmin,
+    upload.single('imagen'),
+    async (req, res) => {
+
+        try {
+
+            const {
+                id
+            } = req.params;
+
+
+            let {
+                nombre,
+                cantidadlimite,
+                anos,
+                meses,
+                dias
+            } = req.body;
+
+
+            nombre =
+                String(
+                    nombre || ''
+                ).trim();
+
+
+
+            const productoExistente =
+                await pool.query(`
+                    SELECT
+                        id_producto
+
+                    FROM Productos
+
+                    WHERE
+                        nombre_producto = ?
+
+                        AND
+                        id_producto <> ?
+
+                    LIMIT 1
+                `, [
+                    nombre,
+                    id
+                ]);
+
+
+            if (
+                productoExistente.length > 0
+            ) {
+
+                req.flash(
+                    'message',
+                    'Ya existe un producto con el mismo nombre.'
+                );
+
+
+                return res.redirect(
+                    `/inventario/edit/${id}`
+                );
+
+            }
+
+
+
+            anos =
+                Number.parseInt(
+                    anos,
+                    10
+                ) || 0;
+
+
+            meses =
+                Number.parseInt(
+                    meses,
+                    10
+                ) || 0;
+
+
+            dias =
+                Number.parseInt(
+                    dias,
+                    10
+                ) || 0;
+
+
+
+            const fechaNotificacionCalculada =
+                (
+                    365 *
+                    anos
+                ) +
+                (
+                    30 *
+                    meses
+                ) +
+                dias;
+
+
+            const fechaNotificacion =
+                fechaNotificacionCalculada === 0
+
+                    ?
+                    null
+
+                    :
+                    fechaNotificacionCalculada;
+
+
+
+            await pool.query(
+                `
+                    UPDATE Productos
+
+                    SET ?
+
+                    WHERE
+                        id_producto = ?
+                `,
+                [
+                    {
+                        nombre_producto:
+                            nombre,
+
+                        cantidad_limite:
+                            Number(
+                                cantidadlimite
+                            ) || 0,
+
+                        fecha_notificacion:
+                            fechaNotificacion
+                    },
+
+                    id
+                ]
+            );
+
+
+
+            await actualizarEstadoProducto(
+                id
+            );
+
+
+
+            req.flash(
+                'success',
+                'Producto editado correctamente.'
+            );
+
+
+            return res.redirect(
+                '/inventario'
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                'Error al editar producto:',
+                error
+            );
+
+
+            req.flash(
+                'message',
+                'Error interno del servidor.'
+            );
+
+
+            return res.redirect(
+                `/inventario/edit/${req.params.id}`
+            );
+
+        }
+
     }
+);
 
-    await pool.query('Update Productos set estado_producto = ? WHERE id_producto = ?', [nuevoestadoproducto, id]);
 
-    req.flash('success', 'Inventario Agregado Correctamente');
-    res.redirect('/inventario/edit/' + id);
-});
 
-router.get('/unidades', isLoggedInAdmin, async (req, res) => {
-    const unidades = await pool.query('SELECT * from Unidades');
-    res.render('productos/unidades', { unidades });
-});
+/* =========================================================
+   EDITAR PRECIO
+========================================================= */
 
-router.post('/unidades', isLoggedInAdmin, async (req, res) => {
-    const { nombre, cantidad } = req.body;
-    const cantidadValida = /^(\d+(\.\d{1,3})?)?$/.test(cantidad);
-    if (!cantidadValida) {
-        req.flash('message', 'La cantidad debe ser un número decimal válido (hasta 3 decimales).');
-        return res.redirect('/inventario/unidades');
+router.post(
+    '/editarprecios/:id',
+    isLoggedInAdmin,
+    async (req, res) => {
+
+        try {
+
+            const {
+                id
+            } = req.params;
+
+
+
+            const resultado =
+                await pool.query(`
+                    SELECT *
+                    FROM Precios_productos
+
+                    WHERE
+                        id_precio = ?
+
+                    LIMIT 1
+                `, [
+                    id
+                ]);
+
+
+            if (
+                resultado.length === 0
+            ) {
+
+                req.flash(
+                    'message',
+                    'El precio no existe.'
+                );
+
+
+                return res.redirect(
+                    '/inventario'
+                );
+
+            }
+
+
+
+            const {
+                unidad,
+                precio_compra,
+                precio_venta,
+                codigo_barras
+            } = req.body;
+
+
+
+            const precioCompra =
+                Number(
+                    precio_compra || 0
+                );
+
+
+            const precioVenta =
+                Number(
+                    precio_venta || 0
+                );
+
+
+            const codigo =
+                String(
+                    codigo_barras || ''
+                ).trim() || null;
+
+
+
+            if (
+                !Number.isFinite(
+                    precioCompra
+                ) ||
+
+                precioCompra < 0 ||
+
+                !Number.isFinite(
+                    precioVenta
+                ) ||
+
+                precioVenta < 0
+            ) {
+
+                req.flash(
+                    'message',
+                    'Ingrese precios válidos.'
+                );
+
+
+                return res.redirect(
+                    `/inventario/edit/${resultado[0].id_producto}`
+                );
+
+            }
+
+
+
+            if (codigo) {
+
+                const duplicado =
+                    await pool.query(`
+                        SELECT
+                            id_precio
+
+                        FROM Precios_productos
+
+                        WHERE
+                            codigo_barras = ?
+
+                            AND
+                            id_precio <> ?
+
+                        LIMIT 1
+                    `, [
+                        codigo,
+                        id
+                    ]);
+
+
+                if (
+                    duplicado.length > 0
+                ) {
+
+                    req.flash(
+                        'message',
+                        `El código de barras ${codigo} ya está registrado.`
+                    );
+
+
+                    return res.redirect(
+                        `/inventario/edit/${resultado[0].id_producto}`
+                    );
+
+                }
+
+            }
+
+
+
+            const unidadExistente =
+                await pool.query(`
+                    SELECT
+                        id_precio
+
+                    FROM Precios_productos
+
+                    WHERE
+                        id_producto = ?
+
+                        AND
+                        id_unidad = ?
+
+                        AND
+                        id_precio <> ?
+
+                    LIMIT 1
+                `, [
+                    resultado[0].id_producto,
+                    unidad,
+                    id
+                ]);
+
+
+            if (
+                unidadExistente.length > 0
+            ) {
+
+                req.flash(
+                    'message',
+                    'Ya existe esta unidad registrada en el producto.'
+                );
+
+
+                return res.redirect(
+                    `/inventario/edit/${resultado[0].id_producto}`
+                );
+
+            }
+
+
+
+            await pool.query(
+                `
+                    UPDATE Precios_productos
+
+                    SET ?
+
+                    WHERE
+                        id_precio = ?
+                `,
+                [
+                    {
+                        precio_compra:
+                            precioCompra,
+
+                        precio_venta:
+                            precioVenta,
+
+                        id_unidad:
+                            unidad,
+
+                        codigo_barras:
+                            codigo
+                    },
+
+                    id
+                ]
+            );
+
+
+
+            req.flash(
+                'success',
+                'Precios actualizados correctamente.'
+            );
+
+
+            return res.redirect(
+                `/inventario/edit/${resultado[0].id_producto}`
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                'Error editando precios:',
+                error
+            );
+
+
+            req.flash(
+                'message',
+                'No se pudieron actualizar los precios.'
+            );
+
+
+            return res.redirect(
+                '/inventario'
+            );
+
+        }
+
     }
+);
 
-    const unidadExistente = await pool.query('SELECT * FROM Unidades WHERE nombre = ?', [nombre]);
-    if (unidadExistente.length > 0) {
-        req.flash('message', 'Ya existe una unidad con el mismo nombre.');
-        return res.redirect('/inventario/unidades');
+
+
+/* =========================================================
+   AÑADIR PRECIO
+========================================================= */
+
+router.post(
+    '/anadirprecios/:id',
+    isLoggedInAdmin,
+    async (req, res) => {
+
+        try {
+
+            const {
+                id
+            } = req.params;
+
+
+            const {
+                unidad,
+                precio_compra,
+                precio_venta,
+                codigo_barras
+            } = req.body;
+
+
+            const precioCompra =
+                Number(
+                    precio_compra || 0
+                );
+
+
+            const precioVenta =
+                Number(
+                    precio_venta || 0
+                );
+
+
+            const codigo =
+                String(
+                    codigo_barras || ''
+                ).trim() || null;
+
+
+
+            if (
+                !Number.isFinite(
+                    precioCompra
+                ) ||
+
+                precioCompra < 0 ||
+
+                !Number.isFinite(
+                    precioVenta
+                ) ||
+
+                precioVenta < 0
+            ) {
+
+                req.flash(
+                    'message',
+                    'Ingrese precios válidos.'
+                );
+
+
+                return res.redirect(
+                    `/inventario/edit/${id}`
+                );
+
+            }
+
+
+
+            const unidadExistente =
+                await pool.query(`
+                    SELECT
+                        id_precio
+
+                    FROM Precios_productos
+
+                    WHERE
+                        id_producto = ?
+
+                        AND
+                        id_unidad = ?
+
+                    LIMIT 1
+                `, [
+                    id,
+                    unidad
+                ]);
+
+
+            if (
+                unidadExistente.length > 0
+            ) {
+
+                req.flash(
+                    'message',
+                    'Ya existe esta unidad registrada en el producto.'
+                );
+
+
+                return res.redirect(
+                    `/inventario/edit/${id}`
+                );
+
+            }
+
+
+
+            if (codigo) {
+
+                const codigoExistente =
+                    await pool.query(`
+                        SELECT
+                            id_precio
+
+                        FROM Precios_productos
+
+                        WHERE
+                            codigo_barras = ?
+
+                        LIMIT 1
+                    `, [
+                        codigo
+                    ]);
+
+
+                if (
+                    codigoExistente.length > 0
+                ) {
+
+                    req.flash(
+                        'message',
+                        `El código de barras ${codigo} ya está registrado.`
+                    );
+
+
+                    return res.redirect(
+                        `/inventario/edit/${id}`
+                    );
+
+                }
+
+            }
+
+
+
+            await pool.query(
+                `
+                    INSERT INTO Precios_productos
+                    SET ?
+                `,
+                {
+                    precio_compra:
+                        precioCompra,
+
+                    precio_venta:
+                        precioVenta,
+
+                    id_producto:
+                        id,
+
+                    id_unidad:
+                        unidad,
+
+                    codigo_barras:
+                        codigo
+                }
+            );
+
+
+
+            req.flash(
+                'success',
+                'Precio agregado correctamente.'
+            );
+
+
+            return res.redirect(
+                `/inventario/edit/${id}`
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                'Error agregando precio:',
+                error
+            );
+
+
+            req.flash(
+                'message',
+                'No se pudo agregar el precio.'
+            );
+
+
+            return res.redirect(
+                `/inventario/edit/${req.params.id}`
+            );
+
+        }
+
     }
-    const nuevaFila = {
-        nombre: nombre,
-        cantidad: cantidad,
-    };
-    await pool.query('INSERT INTO Unidades SET ?', [nuevaFila]);
-    req.flash('success', 'Unidad agregada correctamente');
-    res.redirect('/inventario/unidades');
-});
+);
 
-router.get('/unidades/edit/:id', isLoggedInAdmin, async (req, res) => {
-    const { id } = req.params;
-    const unidades = await pool.query('SELECT * FROM Unidades WHERE id_unidad = ?', [id]);
-    res.render('productos/unidadesedit', { unidad: unidades[0] });
-});
 
-router.post('/unidades/edit/:id', isLoggedInAdmin, async (req, res) => {
-    const { id } = req.params;
-    const { nombre, cantidad } = req.body;
 
-    // Verificar si la cantidad es un decimal válido
-    const cantidadValida = /^(\d+(\.\d{1,3})?)?$/.test(cantidad);
-    if (!cantidadValida) {
-        req.flash('message', 'La cantidad debe ser un número decimal válido (hasta 3 decimales).');
-        return res.redirect('/inventario/unidades/edit/' + id);
+/* =========================================================
+   ELIMINAR PRECIO
+========================================================= */
+
+router.get(
+    '/eliminarprecio/:id',
+    isLoggedInAdmin,
+    async (req, res) => {
+
+        try {
+
+            const {
+                id
+            } = req.params;
+
+
+
+            const resultado =
+                await pool.query(`
+                    SELECT
+                        id_producto
+
+                    FROM Precios_productos
+
+                    WHERE
+                        id_precio = ?
+
+                    LIMIT 1
+                `, [
+                    id
+                ]);
+
+
+            if (
+                resultado.length === 0
+            ) {
+
+                req.flash(
+                    'message',
+                    'El precio no existe.'
+                );
+
+
+                return res.redirect(
+                    '/inventario'
+                );
+
+            }
+
+
+
+            await pool.query(`
+                DELETE FROM Precios_productos
+
+                WHERE
+                    id_precio = ?
+            `, [
+                id
+            ]);
+
+
+
+            req.flash(
+                'noti',
+                'Precio eliminado correctamente.'
+            );
+
+
+            return res.redirect(
+                `/inventario/edit/${resultado[0].id_producto}`
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                'Error eliminando precio:',
+                error
+            );
+
+
+            req.flash(
+                'message',
+                'No se pudo eliminar el precio.'
+            );
+
+
+            return res.redirect(
+                '/inventario'
+            );
+
+        }
+
     }
+);
 
-    const unidadExistente = await pool.query('SELECT * FROM Unidades WHERE nombre = ? AND id_unidad <> ?', [nombre, id]);
-    if (unidadExistente.length > 0) {
-        req.flash('message', 'Ya existe una unidad con el mismo nombre.');
-        return res.redirect('/inventario/unidades/edit/' + id);
+
+
+/* =========================================================
+   EDITAR INVENTARIO
+========================================================= */
+
+router.post(
+    '/editarinventarios/:id',
+    isLoggedInAdmin,
+    async (req, res) => {
+
+        try {
+
+            const {
+                id
+            } = req.params;
+
+
+
+            const resultado =
+                await pool.query(`
+                    SELECT *
+                    FROM Fechas_vencimiento
+
+                    WHERE
+                        id_fechavencimiento = ?
+
+                    LIMIT 1
+                `, [
+                    id
+                ]);
+
+
+            if (
+                resultado.length === 0
+            ) {
+
+                req.flash(
+                    'message',
+                    'El registro de inventario no existe.'
+                );
+
+
+                return res.redirect(
+                    '/inventario'
+                );
+
+            }
+
+
+
+            const inventario =
+                Number(
+                    req.body.inventario || 0
+                );
+
+
+            const fechaVencimiento =
+                String(
+                    req.body.fechavencimiento || ''
+                ).trim() || null;
+
+
+
+            if (
+                !Number.isFinite(
+                    inventario
+                ) ||
+
+                inventario < 0
+            ) {
+
+                req.flash(
+                    'message',
+                    'Ingrese un inventario válido mayor o igual que cero.'
+                );
+
+
+                return res.redirect(
+                    `/inventario/edit/${resultado[0].id_producto}`
+                );
+
+            }
+
+
+
+            let fechaExistente;
+
+
+            if (fechaVencimiento) {
+
+                fechaExistente =
+                    await pool.query(`
+                        SELECT
+                            id_fechavencimiento
+
+                        FROM Fechas_vencimiento
+
+                        WHERE
+                            id_producto = ?
+
+                            AND
+                            fecha_vencimiento = ?
+
+                            AND
+                            id_fechavencimiento <> ?
+
+                        LIMIT 1
+                    `, [
+                        resultado[0].id_producto,
+                        fechaVencimiento,
+                        id
+                    ]);
+
+            }
+
+            else {
+
+                fechaExistente =
+                    await pool.query(`
+                        SELECT
+                            id_fechavencimiento
+
+                        FROM Fechas_vencimiento
+
+                        WHERE
+                            id_producto = ?
+
+                            AND
+                            fecha_vencimiento
+                                IS NULL
+
+                            AND
+                            id_fechavencimiento <> ?
+
+                        LIMIT 1
+                    `, [
+                        resultado[0].id_producto,
+                        id
+                    ]);
+
+            }
+
+
+
+            if (
+                fechaExistente.length > 0
+            ) {
+
+                req.flash(
+                    'message',
+                    'Ya existe esta fecha de vencimiento en el producto.'
+                );
+
+
+                return res.redirect(
+                    `/inventario/edit/${resultado[0].id_producto}`
+                );
+
+            }
+
+
+
+            await pool.query(
+                `
+                    UPDATE Fechas_vencimiento
+
+                    SET ?
+
+                    WHERE
+                        id_fechavencimiento = ?
+                `,
+                [
+                    {
+                        fecha_vencimiento:
+                            fechaVencimiento,
+
+                        inventario
+                    },
+
+                    id
+                ]
+            );
+
+
+
+            await actualizarEstadoProducto(
+                resultado[0].id_producto
+            );
+
+
+
+            req.flash(
+                'success',
+                'Inventario actualizado correctamente.'
+            );
+
+
+            return res.redirect(
+                `/inventario/edit/${resultado[0].id_producto}`
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                'Error editando inventario:',
+                error
+            );
+
+
+            req.flash(
+                'message',
+                'No se pudo actualizar el inventario.'
+            );
+
+
+            return res.redirect(
+                '/inventario'
+            );
+
+        }
+
     }
-    const nuevaFila = {
-        nombre: nombre,
-        cantidad: cantidad,
-    };
-    await pool.query('UPDATE Unidades SET ? WHERE id_unidad = ?', [nuevaFila, id]);
-    req.flash('success', 'Unidad de medida modificada correctamente');
-    res.redirect('/inventario/unidades');
-});
+);
+
+
+
+/* =========================================================
+   AÑADIR INVENTARIO
+========================================================= */
+
+router.post(
+    '/anadirinventarios/:id',
+    isLoggedInAdmin,
+    async (req, res) => {
+
+        try {
+
+            const {
+                id
+            } = req.params;
+
+
+            const inventario =
+                Number(
+                    req.body.inventario || 0
+                );
+
+
+            const fechaVencimiento =
+                String(
+                    req.body.fechavencimiento || ''
+                ).trim() || null;
+
+
+
+            if (
+                !Number.isFinite(
+                    inventario
+                ) ||
+
+                inventario < 0
+            ) {
+
+                req.flash(
+                    'message',
+                    'Ingrese un inventario válido mayor o igual que cero.'
+                );
+
+
+                return res.redirect(
+                    `/inventario/edit/${id}`
+                );
+
+            }
+
+
+
+            let fechaExistente;
+
+
+            if (fechaVencimiento) {
+
+                fechaExistente =
+                    await pool.query(`
+                        SELECT
+                            id_fechavencimiento
+
+                        FROM Fechas_vencimiento
+
+                        WHERE
+                            id_producto = ?
+
+                            AND
+                            fecha_vencimiento = ?
+
+                        LIMIT 1
+                    `, [
+                        id,
+                        fechaVencimiento
+                    ]);
+
+            }
+
+            else {
+
+                fechaExistente =
+                    await pool.query(`
+                        SELECT
+                            id_fechavencimiento
+
+                        FROM Fechas_vencimiento
+
+                        WHERE
+                            id_producto = ?
+
+                            AND
+                            fecha_vencimiento
+                                IS NULL
+
+                        LIMIT 1
+                    `, [
+                        id
+                    ]);
+
+            }
+
+
+
+            if (
+                fechaExistente.length > 0
+            ) {
+
+                req.flash(
+                    'message',
+                    'Ya existe esta fecha de vencimiento en el producto.'
+                );
+
+
+                return res.redirect(
+                    `/inventario/edit/${id}`
+                );
+
+            }
+
+
+
+            await pool.query(
+                `
+                    INSERT INTO Fechas_vencimiento
+                    SET ?
+                `,
+                {
+                    fecha_vencimiento:
+                        fechaVencimiento,
+
+                    inventario,
+
+                    id_producto:
+                        id
+                }
+            );
+
+
+
+            await actualizarEstadoProducto(
+                id
+            );
+
+
+
+            req.flash(
+                'success',
+                'Inventario agregado correctamente.'
+            );
+
+
+            return res.redirect(
+                `/inventario/edit/${id}`
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                'Error agregando inventario:',
+                error
+            );
+
+
+            req.flash(
+                'message',
+                'No se pudo agregar el inventario.'
+            );
+
+
+            return res.redirect(
+                `/inventario/edit/${req.params.id}`
+            );
+
+        }
+
+    }
+);
+
+
+
+/* =========================================================
+   ELIMINAR INVENTARIO
+========================================================= */
+
+router.get(
+    '/eliminarinventario/:id',
+    isLoggedInAdmin,
+    async (req, res) => {
+
+        try {
+
+            const {
+                id
+            } = req.params;
+
+
+
+            const resultado =
+                await pool.query(`
+                    SELECT
+                        id_producto
+
+                    FROM Fechas_vencimiento
+
+                    WHERE
+                        id_fechavencimiento = ?
+
+                    LIMIT 1
+                `, [
+                    id
+                ]);
+
+
+            if (
+                resultado.length === 0
+            ) {
+
+                req.flash(
+                    'message',
+                    'El registro de inventario no existe.'
+                );
+
+
+                return res.redirect(
+                    '/inventario'
+                );
+
+            }
+
+
+
+            const idProducto =
+                resultado[0].id_producto;
+
+
+
+            await pool.query(`
+                DELETE FROM Notificaciones
+
+                WHERE
+                    id_fecha_vencimiento = ?
+            `, [
+                id
+            ]);
+
+
+
+            await pool.query(`
+                DELETE FROM Fechas_vencimiento
+
+                WHERE
+                    id_fechavencimiento = ?
+            `, [
+                id
+            ]);
+
+
+
+            await actualizarEstadoProducto(
+                idProducto
+            );
+
+
+
+            req.flash(
+                'noti',
+                'Inventario eliminado correctamente.'
+            );
+
+
+            return res.redirect(
+                `/inventario/edit/${idProducto}`
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                'Error eliminando inventario:',
+                error
+            );
+
+
+            req.flash(
+                'message',
+                'No se pudo eliminar el inventario.'
+            );
+
+
+            return res.redirect(
+                '/inventario'
+            );
+
+        }
+
+    }
+);
+
+
+
+/* =========================================================
+   UNIDADES
+========================================================= */
+
+router.get(
+    '/unidades',
+    isLoggedInAdmin,
+    async (req, res) => {
+
+        try {
+
+            const unidades =
+                await pool.query(`
+                    SELECT *
+                    FROM Unidades
+
+                    ORDER BY
+                        nombre ASC
+                `);
+
+
+            return res.render(
+                'productos/unidades',
+                {
+                    unidades
+                }
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                'Error cargando unidades:',
+                error
+            );
+
+
+            req.flash(
+                'message',
+                'No se pudieron cargar las unidades.'
+            );
+
+
+            return res.redirect(
+                '/inventario'
+            );
+
+        }
+
+    }
+);
+
+
+
+router.post(
+    '/unidades',
+    isLoggedInAdmin,
+    async (req, res) => {
+
+        try {
+
+            const nombre =
+                String(
+                    req.body.nombre || ''
+                ).trim();
+
+
+            const cantidadTexto =
+                String(
+                    req.body.cantidad || ''
+                ).trim();
+
+
+            const cantidadValida =
+                /^\d+(\.\d{1,3})?$/
+                    .test(
+                        cantidadTexto
+                    );
+
+
+            if (
+                !cantidadValida
+            ) {
+
+                req.flash(
+                    'message',
+                    'La cantidad debe ser un número válido con hasta 3 decimales.'
+                );
+
+
+                return res.redirect(
+                    '/inventario/unidades'
+                );
+
+            }
+
+
+
+            const unidadExistente =
+                await pool.query(`
+                    SELECT
+                        id_unidad
+
+                    FROM Unidades
+
+                    WHERE
+                        nombre = ?
+
+                    LIMIT 1
+                `, [
+                    nombre
+                ]);
+
+
+            if (
+                unidadExistente.length > 0
+            ) {
+
+                req.flash(
+                    'message',
+                    'Ya existe una unidad con el mismo nombre.'
+                );
+
+
+                return res.redirect(
+                    '/inventario/unidades'
+                );
+
+            }
+
+
+
+            await pool.query(
+                `
+                    INSERT INTO Unidades
+                    SET ?
+                `,
+                {
+                    nombre,
+
+                    cantidad:
+                        Number(
+                            cantidadTexto
+                        )
+                }
+            );
+
+
+
+            req.flash(
+                'success',
+                'Unidad agregada correctamente.'
+            );
+
+
+            return res.redirect(
+                '/inventario/unidades'
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                'Error agregando unidad:',
+                error
+            );
+
+
+            req.flash(
+                'message',
+                'No se pudo agregar la unidad.'
+            );
+
+
+            return res.redirect(
+                '/inventario/unidades'
+            );
+
+        }
+
+    }
+);
+
+
+
+router.get(
+    '/unidades/edit/:id',
+    isLoggedInAdmin,
+    async (req, res) => {
+
+        try {
+
+            const unidades =
+                await pool.query(`
+                    SELECT *
+                    FROM Unidades
+
+                    WHERE
+                        id_unidad = ?
+
+                    LIMIT 1
+                `, [
+                    req.params.id
+                ]);
+
+
+            if (
+                unidades.length === 0
+            ) {
+
+                req.flash(
+                    'message',
+                    'La unidad no existe.'
+                );
+
+
+                return res.redirect(
+                    '/inventario/unidades'
+                );
+
+            }
+
+
+
+            return res.render(
+                'productos/unidadesedit',
+                {
+                    unidad:
+                        unidades[0]
+                }
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                'Error cargando unidad:',
+                error
+            );
+
+
+            req.flash(
+                'message',
+                'No se pudo cargar la unidad.'
+            );
+
+
+            return res.redirect(
+                '/inventario/unidades'
+            );
+
+        }
+
+    }
+);
+
+
+
+router.post(
+    '/unidades/edit/:id',
+    isLoggedInAdmin,
+    async (req, res) => {
+
+        try {
+
+            const {
+                id
+            } = req.params;
+
+
+            const nombre =
+                String(
+                    req.body.nombre || ''
+                ).trim();
+
+
+            const cantidadTexto =
+                String(
+                    req.body.cantidad || ''
+                ).trim();
+
+
+            const cantidadValida =
+                /^\d+(\.\d{1,3})?$/
+                    .test(
+                        cantidadTexto
+                    );
+
+
+            if (
+                !cantidadValida
+            ) {
+
+                req.flash(
+                    'message',
+                    'La cantidad debe ser un número válido con hasta 3 decimales.'
+                );
+
+
+                return res.redirect(
+                    `/inventario/unidades/edit/${id}`
+                );
+
+            }
+
+
+
+            const unidadExistente =
+                await pool.query(`
+                    SELECT
+                        id_unidad
+
+                    FROM Unidades
+
+                    WHERE
+                        nombre = ?
+
+                        AND
+                        id_unidad <> ?
+
+                    LIMIT 1
+                `, [
+                    nombre,
+                    id
+                ]);
+
+
+            if (
+                unidadExistente.length > 0
+            ) {
+
+                req.flash(
+                    'message',
+                    'Ya existe una unidad con el mismo nombre.'
+                );
+
+
+                return res.redirect(
+                    `/inventario/unidades/edit/${id}`
+                );
+
+            }
+
+
+
+            await pool.query(
+                `
+                    UPDATE Unidades
+
+                    SET ?
+
+                    WHERE
+                        id_unidad = ?
+                `,
+                [
+                    {
+                        nombre,
+
+                        cantidad:
+                            Number(
+                                cantidadTexto
+                            )
+                    },
+
+                    id
+                ]
+            );
+
+
+
+            req.flash(
+                'success',
+                'Unidad modificada correctamente.'
+            );
+
+
+            return res.redirect(
+                '/inventario/unidades'
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                'Error editando unidad:',
+                error
+            );
+
+
+            req.flash(
+                'message',
+                'No se pudo modificar la unidad.'
+            );
+
+
+            return res.redirect(
+                '/inventario/unidades'
+            );
+
+        }
+
+    }
+);
+
+
 
 module.exports = router;

@@ -1,50 +1,252 @@
-<div class="container mt-4">
-    <div class="row">
-        <div class="col-md-8 mx-auto">
-            <div class="card-header text-center">
-                <a href="/compras" class="text-dark" style="text-decoration: none;"><h2>Compras</h2></a>
-            </div>
-            <div class="d-grid gap-2 mb-3 mt-4">
-                <a class="btn btn-success" href="/compras/add">Registrar Nueva Compra</a>
-            </div>
-            <form action="/compras" method="GET">
-                <h5 class="mb-3 text-center">Filtrar por fechas</h5>
-                <div class="input-group mb-3">
-                    <span class="input-group-text">Fecha inicial</span>
-                    <input type="date" class="form-control" name="q" value="{{q}}" aria-label="">
-                    <span class="input-group-text">Fecha final</span>
-                    <input type="date" class="form-control" name="q1" value="{{q1}}" aria-label="">
-                    <button class="btn btn-primary" type="submit">Filtrar</button>
-                </div>
-            </form>
-            {{#if montototall}}<h5 class="mb-3 text-center">Compras totales: S/. {{montototall}}</h5>{{/if}}
-            {{#if compras}}
-            <table class="table table-striped-columns text-center">
-                <thead>
-                    <tr class="table-primary">
-                        <th scope="col">Fecha</th>
-                        <th scope="col">Monto Total</th>
-                        <th scope="col">Detalle Compra</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {{#each compras}}
-                    <tr>
-                        <th>{{fecha_compra}}</th>
-                        <td>S/. {{monto_total}}</td>
-                        <td><a class="btn btn-outline-secondary" href="/compras/detalle/{{id_compra}}">Ver
-                                Detalle</a></td>
-                    </tr>
-                    {{/each}}
-                </tbody>
-            </table>
-            {{else}}
-            <div class="container text-center">
-                <div class="row mt-5">
-                    <h3>No hay compras para mostrar</h3>
-                </div>
-            </div>
-            {{/if}}
-        </div>
+<div class="container-xl py-4">
+
+    <div
+        class="
+            d-flex
+            justify-content-between
+            align-items-center
+            flex-wrap
+            gap-2
+            mb-3
+        "
+    >
+
+        <h2 class="m-0">
+            Compras
+        </h2>
+
+
+        <a
+            class="btn btn-success"
+            href="/compras/add"
+        >
+            <i class="fas fa-plus me-1"></i>
+            Nueva Compra
+        </a>
+
     </div>
+
+
+    <div class="card mb-3">
+
+        <div class="card-body">
+
+            <form
+                action="/compras"
+                method="GET"
+                class="row g-2 align-items-end"
+            >
+
+                <div class="col-md-3">
+
+                    <label class="form-label">
+                        Desde
+                    </label>
+
+                    <input
+                        type="date"
+                        name="q"
+                        value="{{q}}"
+                        class="form-control"
+                    >
+
+                </div>
+
+
+                <div class="col-md-3">
+
+                    <label class="form-label">
+                        Hasta
+                    </label>
+
+                    <input
+                        type="date"
+                        name="q1"
+                        value="{{q1}}"
+                        class="form-control"
+                    >
+
+                </div>
+
+
+                <div class="col-md-3">
+
+                    <label class="form-label">
+                        Orden
+                    </label>
+
+                    <select
+                        name="orden"
+                        class="form-select"
+                    >
+
+                        <option
+                            value="desc"
+                            {{#ifvalue orden value="desc"}}selected{{/ifvalue}}
+                        >
+                            Más recientes primero
+                        </option>
+
+                        <option
+                            value="asc"
+                            {{#ifvalue orden value="asc"}}selected{{/ifvalue}}
+                        >
+                            Más antiguas primero
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <div class="col-md-3">
+
+                    <div class="d-flex gap-2">
+
+                        <button
+                            type="submit"
+                            class="btn btn-primary flex-grow-1"
+                        >
+                            Aplicar
+                        </button>
+
+                        <a
+                            href="/compras"
+                            class="btn btn-outline-secondary"
+                        >
+                            Limpiar
+                        </a>
+
+                    </div>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+
+
+    {{#if montototall}}
+
+        <div
+            class="
+                alert alert-light
+                border
+                d-flex
+                justify-content-between
+                align-items-center
+            "
+        >
+
+            <span>
+                Total del período
+            </span>
+
+            <strong>
+                S/. {{montototall}}
+            </strong>
+
+        </div>
+
+    {{/if}}
+
+
+    {{#if compras}}
+
+        <div class="table-responsive">
+
+            <table
+                class="
+                    table
+                    table-hover
+                    align-middle
+                "
+            >
+
+                <thead class="table-primary">
+
+                    <tr>
+
+                        <th>
+                            N°
+                        </th>
+
+                        <th>
+                            Fecha
+                        </th>
+
+                        <th>
+                            Hora
+                        </th>
+
+                        <th class="text-end">
+                            Total
+                        </th>
+
+                        <th class="text-end">
+                            Acción
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody>
+
+                    {{#each compras}}
+
+                        <tr>
+
+                            <td>
+                                #{{id_compra}}
+                            </td>
+
+                            <td>
+                                {{fecha_mostrar}}
+                            </td>
+
+                            <td>
+                                {{hora_mostrar}}
+                            </td>
+
+                            <td class="text-end fw-semibold">
+                                S/. {{monto_total}}
+                            </td>
+
+                            <td class="text-end">
+
+                                <a
+                                    class="btn btn-sm btn-outline-secondary"
+                                    href="/compras/detalle/{{id_compra}}"
+                                >
+                                    Ver detalle
+                                </a>
+
+                            </td>
+
+                        </tr>
+
+                    {{/each}}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    {{else}}
+
+        <div class="text-center py-5 text-muted">
+
+            <h4>
+                No hay compras para mostrar
+            </h4>
+
+        </div>
+
+    {{/if}}
+
 </div>

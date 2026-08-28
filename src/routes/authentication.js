@@ -27,11 +27,51 @@ router.get('/signin', isNotLoggedIn, async (req, res) => {
 });
 
 router.post('/signin', isNotLoggedIn, (req, res, next) => {
-    passport.authenticate('local.signin', {
-        successRedirect: '/',
-        failureRedirect: '/signin',
-        failureFlash: true
+
+    passport.authenticate('local.signin', (err, user, info) => {
+
+        if (err) {
+            return next(err);
+        }
+
+        if (!user) {
+
+            req.flash(
+                'message',
+                info?.message || 'Usuario o contraseña incorrectos'
+            );
+
+            return res.redirect('/signin');
+        }
+
+        req.logIn(user, (err) => {
+
+            if (err) {
+                return next(err);
+            }
+
+            req.flash(
+                'success',
+                `Bienvenido al sistema, ${user.nombre}`
+            );
+
+            /*
+             * Guardamos explícitamente la sesión
+             * antes de redireccionar.
+             */
+            req.session.save((err) => {
+
+                if (err) {
+                    return next(err);
+                }
+
+                return res.redirect('/');
+            });
+
+        });
+
     })(req, res, next);
+
 });
 
 router.get('/asignarUsuario', isLoggedInAdmin, async (req, res) => {
@@ -164,10 +204,30 @@ router.post('/PerfilContra', isLoggedInAdmin, async (req, res) => {
 });
 
 router.get('/logout', isLoggedIn, (req, res, next) => {
-    req.logout(function (err) {
-        if (err) { return next(err); }
+
+    req.logout((err) => {
+
+        if (err) {
+            return next(err);
+        }
+
+        req.flash(
+            'success',
+            'Sesión cerrada correctamente'
+        );
+
+        req.session.save((err) => {
+
+            if (err) {
+                return next(err);
+            }
+
+            return res.redirect('/');
+
+        });
+
     });
-    res.redirect('/');
+
 });
 
 module.exports = router;

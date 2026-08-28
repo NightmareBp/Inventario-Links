@@ -1,44 +1,126 @@
-{{#if success}}
-<div class="container p-4"><br><br>
-    <div class="row">
-        <div class="col-md-4 mx-auto">
-            <div class="alert alert-success alert-dismissible fade show" role="alert">
+<div class="flash-messages">
+
+    {{#if success}}
+    <div class="alert alert-success alert-dismissible fade show flash-alert" role="alert">
+        
+        <div class="flash-alert-content">
+            <i class="fas fa-check-circle flash-alert-icon"></i>
+
+            <span>
                 {{success}}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close">
-                    <span aria-hidden="true"></span>
-                </button>
-            </div>
+            </span>
         </div>
-    </div>
-</div>
-{{/if}}
 
-{{#if message}}
-<div class="container"><br><br>
-    <div class="row">
-        <div class="col-md-4 mx-auto">
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <button
+            type="button"
+            class="btn-close"
+            data-bs-dismiss="alert"
+            aria-label="Cerrar"
+        ></button>
+
+    </div>
+    {{/if}}
+
+
+    {{#if message}}
+    <div class="alert alert-danger alert-dismissible fade show flash-alert" role="alert">
+
+        <div class="flash-alert-content">
+            <i class="fas fa-exclamation-circle flash-alert-icon"></i>
+
+            <span>
                 {{message}}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close">
-                    <span aria-hidden="true"></span>
-                </button>
-            </div>
+            </span>
         </div>
-    </div>
-</div>
-{{/if}}
 
-{{#if noti}}
-<div class="container"><br><br>
-    <div class="row">
-        <div class="col-md-4 mx-auto">
-            <div class="alert alert-primary alert-dismissible fade show" role="alert">
-                {{noti}}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close">
-                    <span aria-hidden="true"></span>
-                </button>
-            </div>
-        </div>
+        <button
+            type="button"
+            class="btn-close"
+            data-bs-dismiss="alert"
+            aria-label="Cerrar"
+        ></button>
+
     </div>
+    {{/if}}
+
+
+    {{#if noti}}
+    <div class="alert alert-primary alert-dismissible fade show flash-alert" role="alert">
+
+        <div class="flash-alert-content">
+            <i class="fas fa-info-circle flash-alert-icon"></i>
+
+            <span>
+                {{noti}}
+            </span>
+        </div>
+
+        <button
+            type="button"
+            class="btn-close"
+            data-bs-dismiss="alert"
+            aria-label="Cerrar"
+        ></button>
+
+    </div>
+    {{/if}}
+
 </div>
-{{/if}}
+
+
+<script>
+
+    document.addEventListener('DOMContentLoaded', () => {
+
+        const alerts =
+            document.querySelectorAll('.flash-alert');
+
+
+        alerts.forEach((alert) => {
+
+            /*
+             * Cerrar automáticamente después
+             * de 5 segundos.
+             */
+            setTimeout(() => {
+
+                /*
+                 * Verificamos que la alerta
+                 * todavía exista.
+                 */
+                if (!document.body.contains(alert)) {
+                    return;
+                }
+
+
+                /*
+                 * Usamos Bootstrap para mantener
+                 * la animación de cierre.
+                 */
+                if (
+                    typeof bootstrap !== 'undefined' &&
+                    bootstrap.Alert
+                ) {
+
+                    const bootstrapAlert =
+                        bootstrap.Alert.getOrCreateInstance(alert);
+
+                    bootstrapAlert.close();
+
+                } else {
+
+                    /*
+                     * Respaldo por si Bootstrap JS
+                     * todavía no estuviera disponible.
+                     */
+                    alert.remove();
+
+                }
+
+            }, 5000);
+
+        });
+
+    });
+
+</script>

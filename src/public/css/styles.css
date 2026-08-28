@@ -74,3 +74,124 @@ footer {
     display: inline-block;
     /* Mostrar el contador al pasar el mouse sobre el enlace */
 }
+
+/* =====================================================
+   MENSAJES / ALERTAS FLOTANTES
+===================================================== */
+
+.flash-messages {
+    position: fixed;
+
+    /*
+     * Debajo del navbar.
+     */
+    top: 85px;
+    right: 20px;
+
+    /*
+     * Siempre encima del contenido normal.
+     */
+    z-index: 9999;
+
+    width: min(420px, calc(100vw - 40px));
+
+    /*
+     * El contenedor transparente no debe
+     * bloquear clics en la página.
+     */
+    pointer-events: none;
+}
+
+
+/* Cada alerta individual */
+.flash-alert {
+    position: relative;
+
+    width: 100%;
+
+    margin-bottom: 12px;
+    padding: 14px 45px 14px 16px;
+
+    border: none;
+    border-radius: 10px;
+
+    box-shadow:
+        0 5px 15px rgba(0, 0, 0, 0.15);
+
+    /*
+     * La alerta sí puede recibir clics.
+     */
+    pointer-events: auto;
+
+    animation:
+        flashSlideIn 0.35s ease-out;
+
+    font-size: 0.95rem;
+}
+
+
+/* Contenido del mensaje */
+.flash-alert-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+
+/* Icono */
+.flash-alert-icon {
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+
+/* Botón cerrar */
+.flash-alert .btn-close {
+    position: absolute;
+    top: 50%;
+    right: 14px;
+
+    transform: translateY(-50%);
+}
+
+
+/* Animación de entrada */
+@keyframes flashSlideIn {
+
+    from {
+        opacity: 0;
+        transform: translateX(40px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+
+}
+
+
+/* =====================================================
+   CELULARES
+===================================================== */
+
+@media (max-width: 576px) {
+
+    .flash-messages {
+        top: 75px;
+
+        left: 12px;
+        right: 12px;
+
+        width: auto;
+    }
+
+
+    .flash-alert {
+        font-size: 0.9rem;
+
+        padding:
+            12px 42px 12px 14px;
+    }
+
+}

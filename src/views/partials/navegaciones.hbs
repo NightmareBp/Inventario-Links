@@ -1,127 +1,801 @@
 <header class="navbar navbar-expand-lg sticky-top bg-dark">
-    <nav class="container-xxl navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="/">
-                <img src="/img/Logo Link.jpg" alt="Mikeila" width="100">
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
-                data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false"
-                aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarSupportedContent">
-                <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
-                    {{#if user.nombre}}
-                    {{#ifvalue user.tipo value=1}}
-                    <li class="nav-item">
-                        <a href="/notificaciones" class="nav-link">
-                            <i class="fas fa-bell"></i>
-                            <span id="notificationCount" class="notification-count"></span>
-                        </a>
-                    </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button"
-                            data-bs-toggle="dropdown" aria-expanded="false">
-                            Gestionar Productos
-                        </a>
-                        <ul class="dropdown-menu m-auto" aria-labelledby="navbarDropdown">
-                            <li><a class="dropdown-item" href="/inventario">Ver Inventario</a></li>
-                            <li>
-                                <hr class="dropdown-divider">
-                            </li>
-                            <li><a class="dropdown-item" href="/inventario/add">Añadir Producto</a></li>
-                        </ul>
-                    </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button"
-                            data-bs-toggle="dropdown" aria-expanded="false">
-                            Gestionar Negocio
-                        </a>
-                        <ul class="dropdown-menu m-auto" aria-labelledby="navbarDropdown">
-                            <li><a class="dropdown-item" href="/compras">Ver Compras</a></li>
-                            <li>
-                                <hr class="dropdown-divider">
-                            </li>
-                            <li><a class="dropdown-item" href="/compras/add">Registrar Compra</a></li>
-                            <li>
-                                <hr class="dropdown-divider">
-                            </li>
-                            <li><a class="dropdown-item" href="/ventas">Ver Ventas</a></li>
-                            <li>
-                                <hr class="dropdown-divider">
-                            </li>
-                            <li><a class="dropdown-item" href="/ventas/add">Registrar Venta</a></li>
-                            <li>
-                                <hr class="dropdown-divider">
-                            </li>
-                            <li><a class="dropdown-item" href="/asignarUsuario">Ver Usuarios del Sistema</a></li>
-                        </ul>
-                    </li>
-                    <li class="nav-item">
-                        <a href="/ventas/add" class="nav-link">Realizar Venta</a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="/Perfil" class="nav-link">Perfil</a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="/logout" class="nav-link">Salir</a>
-                    </li>
-                    {{/ifvalue}}
-                    {{#ifvalue user.tipo value=2}}
-                    <li class="nav-item">
-                        <a href="/notificaciones" class="nav-link">
-                            <i class="fas fa-bell"></i>
-                            <span id="notificationCount" class="notification-count">{{countNotifications}}</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="/inventario" class="nav-link">Ver inventario</a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="/ventas/add" class="nav-link">Realizar Venta</a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="/ventas" class="nav-link">Ver Ventas</a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="/Perfil" class="nav-link">Perfil</a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="/logout" class="nav-link">Salir</a>
-                    </li>
-                    {{/ifvalue}}
-                    {{else}}
-                    <li class="nav-item">
-                        <a href="/signin" class="nav-link">Ingresa</a>
-                    </li>
-                    {{/if}}
-                </ul>
-            </div>
-        </div>
-    </nav>
-</header>
-<script>
-    // Función para cargar el número de notificaciones
-    async function loadNotificationCount() {
-        try {
-            const response = await fetch('/notificaciones/notificationCount'); // Realizar la solicitud al servidor
-            const data = await response.json(); // Obtener los datos de la respuesta
-            const count = data.cuenta; // Extraer el número de notificaciones del objeto de respuesta
-            $('#notificationCount').text(count); // Actualizar el contador de notificaciones en el HTML
 
-            // Hacer visible el contador solo si hay notificaciones sin abrir
-            if (count > 0) {
-                $('#notificationCount').show();
-            } else {
-                $('#notificationCount').hide();
-            }
-        } catch (error) {
-            console.error('Error al cargar el número de notificaciones:', error);
-        }
+    <nav class="container-xxl navbar navbar-expand-lg navbar-dark bg-dark">
+
+        <div class="container-fluid">
+
+
+            <!-- =====================================================
+                 LOGO
+            ====================================================== -->
+
+            <a
+                class="navbar-brand"
+                href="/"
+            >
+
+                <img
+                    src="/img/Logo Link.jpg"
+                    alt="Links"
+                    width="100"
+                >
+
+            </a>
+
+
+
+            <!-- =====================================================
+                 BOTÓN RESPONSIVE
+            ====================================================== -->
+
+            <button
+                class="navbar-toggler"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#navbarSupportedContent"
+                aria-controls="navbarSupportedContent"
+                aria-expanded="false"
+                aria-label="Mostrar navegación"
+            >
+
+                <span class="navbar-toggler-icon"></span>
+
+            </button>
+
+
+
+            <!-- =====================================================
+                 NAVEGACIÓN
+            ====================================================== -->
+
+            <div
+                class="collapse navbar-collapse"
+                id="navbarSupportedContent"
+            >
+
+                <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-lg-center">
+
+
+                    {{#if user}}
+
+
+                        <!-- =================================================
+                             ADMINISTRADOR
+                        ================================================== -->
+
+                        {{#ifvalue user.tipo value=1}}
+
+
+                            <!-- =============================================
+                                 NOTIFICACIONES
+                            ============================================== -->
+
+                            <li class="nav-item">
+
+                                <a
+                                    href="/notificaciones"
+                                    class="nav-link position-relative"
+                                    title="Notificaciones"
+                                    aria-label="Notificaciones"
+                                >
+
+                                    <i class="fas fa-bell"></i>
+
+
+                                    <span
+                                        id="notificationCount"
+                                        class="notification-count"
+                                        style="display: none;"
+                                    ></span>
+
+                                </a>
+
+                            </li>
+
+
+
+                            <!-- =============================================
+                                 ACCESO RÁPIDO AL INVENTARIO
+                            ============================================== -->
+
+                            <li class="nav-item">
+
+                                <a
+                                    href="/inventario"
+                                    class="nav-link nav-quick-link"
+                                    title="Ver Inventario"
+                                >
+
+                                    <i class="fas fa-boxes me-1"></i>
+
+                                    Inventario
+
+                                </a>
+
+                            </li>
+
+
+
+                            <!-- =============================================
+                                 GESTIONAR PRODUCTOS
+                            ============================================== -->
+
+                            <li class="nav-item dropdown">
+
+                                <a
+                                    class="nav-link dropdown-toggle"
+                                    href="#"
+                                    id="dropdownProductos"
+                                    role="button"
+                                    data-bs-toggle="dropdown"
+                                    aria-expanded="false"
+                                >
+
+                                    Gestionar Productos
+
+                                </a>
+
+
+                                <ul
+                                    class="dropdown-menu"
+                                    aria-labelledby="dropdownProductos"
+                                >
+
+                                    <li>
+
+                                        <a
+                                            class="dropdown-item"
+                                            href="/inventario"
+                                        >
+
+                                            <i class="fas fa-boxes me-2"></i>
+
+                                            Ver Inventario
+
+                                        </a>
+
+                                    </li>
+
+
+                                    <li>
+
+                                        <hr class="dropdown-divider">
+
+                                    </li>
+
+
+                                    <li>
+
+                                        <a
+                                            class="dropdown-item"
+                                            href="/inventario/add"
+                                        >
+
+                                            <i class="fas fa-plus me-2"></i>
+
+                                            Añadir Producto
+
+                                        </a>
+
+                                    </li>
+
+
+                                    <li>
+
+                                        <a
+                                            class="dropdown-item"
+                                            href="/inventario/unidades"
+                                        >
+
+                                            <i class="fas fa-ruler-combined me-2"></i>
+
+                                            Gestionar Unidades
+
+                                        </a>
+
+                                    </li>
+
+                                </ul>
+
+                            </li>
+
+
+
+                            <!-- =============================================
+                                 GESTIONAR NEGOCIO
+                            ============================================== -->
+
+                            <li class="nav-item dropdown">
+
+                                <a
+                                    class="nav-link dropdown-toggle"
+                                    href="#"
+                                    id="dropdownNegocio"
+                                    role="button"
+                                    data-bs-toggle="dropdown"
+                                    aria-expanded="false"
+                                >
+
+                                    Gestionar Negocio
+
+                                </a>
+
+
+                                <ul
+                                    class="dropdown-menu"
+                                    aria-labelledby="dropdownNegocio"
+                                >
+
+                                    <!-- COMPRAS -->
+
+                                    <li>
+
+                                        <a
+                                            class="dropdown-item"
+                                            href="/compras"
+                                        >
+
+                                            <i class="fas fa-shopping-cart me-2"></i>
+
+                                            Ver Compras
+
+                                        </a>
+
+                                    </li>
+
+
+                                    <li>
+
+                                        <a
+                                            class="dropdown-item"
+                                            href="/compras/add"
+                                        >
+
+                                            <i class="fas fa-plus-circle me-2"></i>
+
+                                            Registrar Compra
+
+                                        </a>
+
+                                    </li>
+
+
+                                    <li>
+
+                                        <hr class="dropdown-divider">
+
+                                    </li>
+
+
+                                    <!-- VENTAS -->
+
+                                    <li>
+
+                                        <a
+                                            class="dropdown-item"
+                                            href="/ventas"
+                                        >
+
+                                            <i class="fas fa-receipt me-2"></i>
+
+                                            Ver Ventas
+
+                                        </a>
+
+                                    </li>
+
+
+                                    <li>
+
+                                        <a
+                                            class="dropdown-item"
+                                            href="/ventas/add"
+                                        >
+
+                                            <i class="fas fa-cash-register me-2"></i>
+
+                                            Registrar Venta
+
+                                        </a>
+
+                                    </li>
+
+
+                                    <li>
+
+                                        <hr class="dropdown-divider">
+
+                                    </li>
+
+
+                                    <!-- USUARIOS -->
+
+                                    <li>
+
+                                        <a
+                                            class="dropdown-item"
+                                            href="/asignarUsuario"
+                                        >
+
+                                            <i class="fas fa-users me-2"></i>
+
+                                            Usuarios del Sistema
+
+                                        </a>
+
+                                    </li>
+
+                                </ul>
+
+                            </li>
+
+
+
+                            <!-- =============================================
+                                 VENTA RÁPIDA
+                            ============================================== -->
+
+                            <li class="nav-item">
+
+                                <a
+                                    href="/ventas/add"
+                                    class="nav-link nav-quick-link"
+                                    title="Realizar Venta"
+                                >
+
+                                    <i class="fas fa-cash-register me-1"></i>
+
+                                    Realizar Venta
+
+                                </a>
+
+                            </li>
+
+
+
+                            <!-- =============================================
+                                 PERFIL
+                            ============================================== -->
+
+                            <li class="nav-item">
+
+                                <a
+                                    href="/Perfil"
+                                    class="nav-link"
+                                >
+
+                                    <i class="fas fa-user me-1"></i>
+
+                                    Perfil
+
+                                </a>
+
+                            </li>
+
+
+
+                            <!-- =============================================
+                                 SALIR
+                            ============================================== -->
+
+                            <li class="nav-item">
+
+                                <a
+                                    href="/logout"
+                                    class="nav-link"
+                                >
+
+                                    <i class="fas fa-sign-out-alt me-1"></i>
+
+                                    Salir
+
+                                </a>
+
+                            </li>
+
+
+                        {{/ifvalue}}
+
+
+
+                        <!-- =================================================
+                             USUARIO
+                        ================================================== -->
+
+                        {{#ifvalue user.tipo value=2}}
+
+
+                            <!-- =============================================
+                                 NOTIFICACIONES
+                            ============================================== -->
+
+                            <li class="nav-item">
+
+                                <a
+                                    href="/notificaciones"
+                                    class="nav-link position-relative"
+                                    title="Notificaciones"
+                                    aria-label="Notificaciones"
+                                >
+
+                                    <i class="fas fa-bell"></i>
+
+
+                                    <span
+                                        id="notificationCount"
+                                        class="notification-count"
+                                        style="display: none;"
+                                    ></span>
+
+                                </a>
+
+                            </li>
+
+
+
+                            <!-- =============================================
+                                 INVENTARIO RÁPIDO
+                            ============================================== -->
+
+                            <li class="nav-item">
+
+                                <a
+                                    href="/inventario"
+                                    class="nav-link nav-quick-link"
+                                    title="Ver Inventario"
+                                >
+
+                                    <i class="fas fa-boxes me-1"></i>
+
+                                    Inventario
+
+                                </a>
+
+                            </li>
+
+
+
+                            <!-- =============================================
+                                 VENTA RÁPIDA
+                            ============================================== -->
+
+                            <li class="nav-item">
+
+                                <a
+                                    href="/ventas/add"
+                                    class="nav-link nav-quick-link"
+                                    title="Realizar Venta"
+                                >
+
+                                    <i class="fas fa-cash-register me-1"></i>
+
+                                    Realizar Venta
+
+                                </a>
+
+                            </li>
+
+
+
+                            <!-- =============================================
+                                 VER VENTAS
+                            ============================================== -->
+
+                            <li class="nav-item">
+
+                                <a
+                                    href="/ventas"
+                                    class="nav-link"
+                                >
+
+                                    <i class="fas fa-receipt me-1"></i>
+
+                                    Ver Ventas
+
+                                </a>
+
+                            </li>
+
+
+
+                            <!-- =============================================
+                                 PERFIL
+                            ============================================== -->
+
+                            <li class="nav-item">
+
+                                <a
+                                    href="/Perfil"
+                                    class="nav-link"
+                                >
+
+                                    <i class="fas fa-user me-1"></i>
+
+                                    Perfil
+
+                                </a>
+
+                            </li>
+
+
+
+                            <!-- =============================================
+                                 SALIR
+                            ============================================== -->
+
+                            <li class="nav-item">
+
+                                <a
+                                    href="/logout"
+                                    class="nav-link"
+                                >
+
+                                    <i class="fas fa-sign-out-alt me-1"></i>
+
+                                    Salir
+
+                                </a>
+
+                            </li>
+
+
+                        {{/ifvalue}}
+
+
+
+                    {{else}}
+
+
+                        <!-- =================================================
+                             SIN SESIÓN
+                        ================================================== -->
+
+                        <li class="nav-item">
+
+                            <a
+                                href="/signin"
+                                class="nav-link"
+                            >
+
+                                <i class="fas fa-sign-in-alt me-1"></i>
+
+                                Ingresar
+
+                            </a>
+
+                        </li>
+
+
+                    {{/if}}
+
+
+                </ul>
+
+            </div>
+
+        </div>
+
+    </nav>
+
+</header>
+
+
+
+<style>
+
+    /* =====================================================
+       ACCESOS RÁPIDOS
+    ====================================================== */
+
+    .nav-quick-link {
+
+        display: flex;
+
+        align-items: center;
+
+        gap: 2px;
+
     }
 
-    // Llamar a la función para cargar el número de notificaciones al cargar la página
-    $(document).ready(() => {
-        loadNotificationCount();
-    });
+
+    /*
+     * Un poco más cómodo en escritorio.
+     */
+
+    @media (min-width: 992px) {
+
+        .nav-quick-link {
+
+            padding-left: 12px !important;
+
+            padding-right: 12px !important;
+
+        }
+
+    }
+
+
+    /*
+     * En teléfono dejamos más separación
+     * para que sea fácil tocar los enlaces.
+     */
+
+    @media (max-width: 991.98px) {
+
+        .navbar-nav {
+
+            padding-top: 10px;
+
+        }
+
+
+        .navbar-nav .nav-link {
+
+            padding-top: 10px;
+
+            padding-bottom: 10px;
+
+        }
+
+
+        .dropdown-menu {
+
+            margin-bottom: 8px;
+
+        }
+
+    }
+
+</style>
+
+
+
+<script>
+
+    /* =====================================================
+       CONTADOR DE NOTIFICACIONES
+    ====================================================== */
+
+    async function loadNotificationCount() {
+
+
+        /*
+         * Si no existe notificationCount,
+         * significa que no hay sesión iniciada
+         * o que el navbar mostrado no contiene
+         * notificaciones.
+         */
+
+        const notificationCount =
+            document.getElementById(
+                'notificationCount'
+            );
+
+
+        if (!notificationCount) {
+
+            return;
+
+        }
+
+
+        try {
+
+
+            const response =
+                await fetch(
+                    '/notificaciones/notificationCount',
+                    {
+
+                        method:
+                            'GET',
+
+                        headers: {
+
+                            'Accept':
+                                'application/json'
+
+                        }
+
+                    }
+                );
+
+
+            if (!response.ok) {
+
+
+                console.error(
+                    'Error al obtener notificaciones:',
+                    response.status
+                );
+
+
+                return;
+
+            }
+
+
+            const data =
+                await response.json();
+
+
+            const count =
+                Number(
+                    data.cuenta
+                ) || 0;
+
+
+
+            if (count > 0) {
+
+
+                /*
+                 * Si algún día hubiese más de 99,
+                 * evitamos un círculo enorme
+                 * dentro de la barra.
+                 */
+
+                notificationCount.textContent =
+                    count > 99
+                        ? '99+'
+                        : String(count);
+
+
+                notificationCount.style.display =
+                    '';
+
+
+                notificationCount.setAttribute(
+                    'aria-label',
+                    `${count} notificaciones nuevas`
+                );
+
+
+            }
+
+            else {
+
+
+                notificationCount.textContent =
+                    '';
+
+
+                notificationCount.style.display =
+                    'none';
+
+
+                notificationCount.removeAttribute(
+                    'aria-label'
+                );
+
+
+            }
+
+
+        }
+
+        catch (error) {
+
+
+            console.error(
+                'Error al cargar el número de notificaciones:',
+                error
+            );
+
+
+        }
+
+    }
+
+
+
+    /* =====================================================
+       CARGAR DESPUÉS DE INICIAR LA PÁGINA
+    ====================================================== */
+
+    document.addEventListener(
+        'DOMContentLoaded',
+        loadNotificationCount
+    );
+
 </script>

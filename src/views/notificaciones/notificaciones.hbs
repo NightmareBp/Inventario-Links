@@ -1,114 +1,1941 @@
-<div style="height: 100vh;" class="container text-center mt-4">
-    <div class="card col-md-8 m-auto">
-        <div class="card-header d-flex justify-content-between">
-            Notificaciones
+<style>
+
+    /* =====================================================
+       CONTENEDOR GENERAL
+    ====================================================== */
+
+    .notifications-page {
+
+        max-width: 980px;
+
+        margin: 0 auto;
+
+        /*
+         * Ya NO usamos height: 100vh.
+         *
+         * La página crecerá naturalmente
+         * según la cantidad de contenido.
+         */
+
+        padding:
+            22px
+            14px
+            60px;
+
+    }
+
+
+    /* =====================================================
+       CABECERA
+    ====================================================== */
+
+    .notifications-header {
+
+        display: flex;
+
+        justify-content:
+            space-between;
+
+        align-items: center;
+
+        gap: 12px;
+
+        flex-wrap: wrap;
+
+        margin-bottom: 14px;
+
+    }
+
+
+    .notifications-title {
+
+        margin: 0;
+
+        font-size: 1.55rem;
+
+    }
+
+
+    .notifications-subtitle {
+
+        margin-top: 3px;
+
+        color: #6c757d;
+
+        font-size: .85rem;
+
+    }
+
+
+    .notifications-header-actions {
+
+        display: flex;
+
+        align-items: center;
+
+        gap: 8px;
+
+        flex-wrap: wrap;
+
+    }
+
+
+    .unread-counter {
+
+        display: inline-flex;
+
+        align-items: center;
+
+        gap: 5px;
+
+        padding:
+            5px
+            9px;
+
+        background: #212529;
+
+        color: #fff;
+
+        border-radius: 999px;
+
+        font-size: .78rem;
+
+    }
+
+
+    /* =====================================================
+       LISTA
+    ====================================================== */
+
+    .notifications-list {
+
+        display: flex;
+
+        flex-direction: column;
+
+        gap: 9px;
+
+    }
+
+
+    .notification-item {
+
+        position: relative;
+
+        display: grid;
+
+        grid-template-columns:
+            46px
+            minmax(0, 1fr)
+            auto;
+
+        gap: 12px;
+
+        align-items: center;
+
+        padding:
+            13px
+            14px;
+
+        background: #fff;
+
+        border:
+            1px solid #dee2e6;
+
+        border-radius: 10px;
+
+        transition:
+            background-color .15s ease,
+            border-color .15s ease,
+            transform .15s ease;
+
+    }
+
+
+    .notification-item:hover {
+
+        background:
+            #fafafa;
+
+        border-color:
+            #ced4da;
+
+    }
+
+
+    /*
+     * Las nuevas destacan ligeramente,
+     * pero sin pintar toda la tarjeta
+     * de amarillo/rojo.
+     */
+
+    .notification-item.unread {
+
+        background:
+            #fffef8;
+
+        border-color:
+            #ddd8bd;
+
+    }
+
+
+    .notification-item::before {
+
+        content: '';
+
+        position: absolute;
+
+        left: 0;
+
+        top: 8px;
+
+        bottom: 8px;
+
+        width: 4px;
+
+        border-radius:
+            0 4px 4px 0;
+
+    }
+
+
+    .notification-item.type-low::before {
+
+        background:
+            #ffc107;
+
+    }
+
+
+    .notification-item.type-out::before {
+
+        background:
+            #dc3545;
+
+    }
+
+
+    .notification-item.type-expiry::before {
+
+        background:
+            #0d6efd;
+
+    }
+
+
+    .notification-item.type-info::before {
+
+        background:
+            #6c757d;
+
+    }
+
+
+    /* =====================================================
+       ICONOS
+    ====================================================== */
+
+    .notification-icon {
+
+        width: 42px;
+
+        height: 42px;
+
+        display: flex;
+
+        justify-content: center;
+
+        align-items: center;
+
+        border-radius: 50%;
+
+        font-size: 1.05rem;
+
+    }
+
+
+    .type-low
+    .notification-icon {
+
+        background:
+            #fff3cd;
+
+        color:
+            #856404;
+
+    }
+
+
+    .type-out
+    .notification-icon {
+
+        background:
+            #f8d7da;
+
+        color:
+            #842029;
+
+    }
+
+
+    .type-expiry
+    .notification-icon {
+
+        background:
+            #cfe2ff;
+
+        color:
+            #084298;
+
+    }
+
+
+    .type-info
+    .notification-icon {
+
+        background:
+            #e2e3e5;
+
+        color:
+            #41464b;
+
+    }
+
+
+    /* =====================================================
+       CONTENIDO
+    ====================================================== */
+
+    .notification-main {
+
+        min-width: 0;
+
+    }
+
+
+    .notification-topline {
+
+        display: flex;
+
+        align-items: center;
+
+        gap: 7px;
+
+        flex-wrap: wrap;
+
+        margin-bottom: 3px;
+
+    }
+
+
+    .notification-type {
+
+        font-size: .75rem;
+
+        font-weight: 600;
+
+        color: #495057;
+
+    }
+
+
+    .new-badge {
+
+        padding:
+            2px 6px;
+
+        border-radius: 999px;
+
+        background:
+            #0d6efd;
+
+        color: #fff;
+
+        font-size: .67rem;
+
+        font-weight: 600;
+
+    }
+
+
+    .notification-content {
+
+        margin: 0;
+
+        color: #212529;
+
+        line-height: 1.35;
+
+        overflow-wrap: anywhere;
+
+    }
+
+
+    .notification-meta {
+
+        display: flex;
+
+        align-items: center;
+
+        gap: 12px;
+
+        flex-wrap: wrap;
+
+        margin-top: 5px;
+
+        color: #6c757d;
+
+        font-size: .75rem;
+
+    }
+
+
+    .notification-meta span {
+
+        display: inline-flex;
+
+        align-items: center;
+
+        gap: 4px;
+
+    }
+
+
+    /* =====================================================
+       ACCIONES
+    ====================================================== */
+
+    .notification-actions {
+
+        display: flex;
+
+        align-items: center;
+
+        gap: 6px;
+
+    }
+
+
+    .notification-actions
+    .btn {
+
+        white-space: nowrap;
+
+    }
+
+
+    /* =====================================================
+       SIN NOTIFICACIONES
+    ====================================================== */
+
+    .notifications-empty {
+
+        padding:
+            60px 20px;
+
+        background: #fff;
+
+        border:
+            1px solid #dee2e6;
+
+        border-radius: 10px;
+
+        text-align: center;
+
+        color: #6c757d;
+
+    }
+
+
+    .notifications-empty-icon {
+
+        width: 64px;
+
+        height: 64px;
+
+        margin:
+            0 auto
+            14px;
+
+        display: flex;
+
+        justify-content: center;
+
+        align-items: center;
+
+        background:
+            #f1f3f5;
+
+        border-radius: 50%;
+
+        font-size: 1.6rem;
+
+    }
+
+
+    /* =====================================================
+       PAGINACIÓN
+    ====================================================== */
+
+    .notifications-pagination {
+
+        margin-top: 18px;
+
+        padding-top: 14px;
+
+        display: flex;
+
+        justify-content:
+            space-between;
+
+        align-items: center;
+
+        gap: 12px;
+
+        flex-wrap: wrap;
+
+        border-top:
+            1px solid #d7d7d7;
+
+    }
+
+
+    .pagination-info {
+
+        color: #6c757d;
+
+        font-size: .8rem;
+
+    }
+
+
+    .pagination-buttons {
+
+        display: flex;
+
+        align-items: center;
+
+        gap: 5px;
+
+        flex-wrap: wrap;
+
+    }
+
+
+    /* =====================================================
+       MODAL
+    ====================================================== */
+
+    .notification-detail-icon {
+
+        width: 54px;
+
+        height: 54px;
+
+        display: flex;
+
+        justify-content: center;
+
+        align-items: center;
+
+        margin:
+            0 auto
+            14px;
+
+        border-radius: 50%;
+
+        background:
+            #f1f3f5;
+
+        font-size: 1.4rem;
+
+    }
+
+
+    .detail-date {
+
+        margin-top: 14px;
+
+        padding: 10px;
+
+        background:
+            #f8f9fa;
+
+        border-radius: 7px;
+
+        font-size: .85rem;
+
+    }
+
+
+    /* =====================================================
+       TELÉFONO
+    ====================================================== */
+
+    @media (
+        max-width: 650px
+    ) {
+
+        .notifications-page {
+
+            padding:
+                12px
+                8px
+                45px;
+
+        }
+
+
+        .notifications-title {
+
+            font-size:
+                1.3rem;
+
+        }
+
+
+        .notifications-header {
+
+            align-items:
+                stretch;
+
+        }
+
+
+        .notifications-header-actions {
+
+            width: 100%;
+
+        }
+
+
+        .notifications-header-actions
+        form {
+
+            flex: 1;
+
+        }
+
+
+        .notifications-header-actions
+        .btn {
+
+            width: 100%;
+
+        }
+
+
+        .notification-item {
+
+            grid-template-columns:
+                38px
+                minmax(0, 1fr);
+
+            gap: 10px;
+
+            padding:
+                12px 10px;
+
+        }
+
+
+        .notification-icon {
+
+            width: 36px;
+
+            height: 36px;
+
+            font-size: .9rem;
+
+        }
+
+
+        .notification-actions {
+
+            grid-column:
+                1 / -1;
+
+            display: grid;
+
+            grid-template-columns:
+                1fr
+                auto;
+
+            width: 100%;
+
+        }
+
+
+        .notification-actions
+        .btn-detail {
+
+            width: 100%;
+
+        }
+
+
+        .notifications-pagination {
+
+            justify-content:
+                center;
+
+            text-align:
+                center;
+
+        }
+
+
+        .pagination-info {
+
+            width: 100%;
+
+        }
+
+
+        .pagination-buttons {
+
+            width: 100%;
+
+            justify-content:
+                center;
+
+        }
+
+    }
+
+</style>
+
+
+
+<div class="notifications-page">
+
+
+    <!-- =====================================================
+         CABECERA
+    ====================================================== -->
+
+    <div class="notifications-header">
+
+
+        <div>
+
+
+            <h2 class="notifications-title">
+
+                <i
+                    class="
+                        fas
+                        fa-bell
+                        me-1
+                    "
+                ></i>
+
+                Notificaciones
+
+            </h2>
+
+
+            <div class="notifications-subtitle">
+
+                Avisos de inventario y vencimiento
+                de productos.
+
+            </div>
+
+
         </div>
-        {{#if notis}}
-        <div class="row">
+
+
+
+        <div class="notifications-header-actions">
+
+
+            {{#if hayNoLeidas}}
+
+
+                <span class="unread-counter">
+
+                    <i
+                        class="
+                            fas
+                            fa-circle
+                        "
+                        style="
+                            font-size:
+                                .45rem;
+                        "
+                    ></i>
+
+                    {{noLeidas}}
+                    nueva(s)
+
+                </span>
+
+
+                <form
+                    action="/notificaciones/marcar-todas-leidas?page={{paginacion.pagina}}"
+                    method="POST"
+                >
+
+                    <button
+                        type="submit"
+                        class="
+                            btn
+                            btn-sm
+                            btn-outline-secondary
+                        "
+                    >
+
+                        <i
+                            class="
+                                fas
+                                fa-check-double
+                                me-1
+                            "
+                        ></i>
+
+                        Marcar todas como leídas
+
+                    </button>
+
+                </form>
+
+
+            {{/if}}
+
+
+        </div>
+
+
+    </div>
+
+
+
+    <!-- =====================================================
+         NOTIFICACIONES
+    ====================================================== -->
+
+    {{#if notis}}
+
+
+        <div class="notifications-list">
+
+
             {{#each notis}}
-            <div class="">
-                <div class="card-body {{#ifvalue estado value=1}}{{#ifvalue existencias value=2}}text-bg-warning{{/ifvalue}}
-            {{#ifvalue existencias value=3}}text-bg-danger{{/ifvalue}}
-            {{#ifvalue existencias value=null}}text-bg-secondary{{/ifvalue}}
-            {{/ifvalue}} border-bottom">
-                    <div class="row">
-                        <div class="col-md-8">
-                            <p class="card-text">{{contenido}}</p>
+
+
+                <article
+
+                    id="notification-{{id_notificacion}}"
+
+                    class="
+                        notification-item
+
+                        {{#if noLeida}}
+                            unread
+                        {{/if}}
+
+                        {{#if tipoBajoStock}}
+                            type-low
+                        {{/if}}
+
+                        {{#if tipoAgotado}}
+                            type-out
+                        {{/if}}
+
+                        {{#if tipoVencimiento}}
+                            type-expiry
+                        {{/if}}
+
+                        {{#if tipoInformacion}}
+                            type-info
+                        {{/if}}
+                    "
+
+                >
+
+
+                    <!-- ICONO -->
+
+                    <div class="notification-icon">
+
+
+                        {{#if tipoBajoStock}}
+
+                            <i
+                                class="
+                                    fas
+                                    fa-exclamation-triangle
+                                "
+                            ></i>
+
+                        {{/if}}
+
+
+                        {{#if tipoAgotado}}
+
+                            <i
+                                class="
+                                    fas
+                                    fa-box-open
+                                "
+                            ></i>
+
+                        {{/if}}
+
+
+                        {{#if tipoVencimiento}}
+
+                            <i
+                                class="
+                                    fas
+                                    fa-calendar-times
+                                "
+                            ></i>
+
+                        {{/if}}
+
+
+                        {{#if tipoInformacion}}
+
+                            <i
+                                class="
+                                    fas
+                                    fa-info-circle
+                                "
+                            ></i>
+
+                        {{/if}}
+
+
+                    </div>
+
+
+
+                    <!-- INFORMACIÓN -->
+
+                    <div class="notification-main">
+
+
+                        <div class="notification-topline">
+
+
+                            <span class="notification-type">
+
+
+                                {{#if tipoBajoStock}}
+                                    Bajas existencias
+                                {{/if}}
+
+
+                                {{#if tipoAgotado}}
+                                    Producto agotado
+                                {{/if}}
+
+
+                                {{#if tipoVencimiento}}
+                                    Vencimiento
+                                {{/if}}
+
+
+                                {{#if tipoInformacion}}
+                                    Información
+                                {{/if}}
+
+
+                            </span>
+
+
+
+                            {{#if noLeida}}
+
+                                <span class="new-badge">
+                                    Nueva
+                                </span>
+
+                            {{/if}}
+
 
                         </div>
-                        <div class="col-md-2">
-                            <button type="button" class="btn btn-success btn-ver-detalle" data-bs-toggle="modal"
-                                data-bs-target="#Modal{{id_notificacion}}" data-bs-whatever="@mdo"
-                                data-id-notificacion="{{id_notificacion}}">Ver Detalle</button>
+
+
+
+                        <p class="notification-content">
+
+                            {{contenido}}
+
+                        </p>
+
+
+
+                        <div class="notification-meta">
+
+
+                            {{#if nombre}}
+
+                                <span>
+
+                                    <i
+                                        class="
+                                            fas
+                                            fa-box
+                                        "
+                                    ></i>
+
+                                    {{nombre}}
+
+                                </span>
+
+                            {{/if}}
+
+
+
+                            {{#if fecha_noti_mostrar}}
+
+                                <span>
+
+                                    <i
+                                        class="
+                                            far
+                                            fa-calendar-alt
+                                        "
+                                    ></i>
+
+                                    {{fecha_noti_mostrar}}
+
+                                </span>
+
+                            {{/if}}
+
+
                         </div>
-                        <div class="col-md-2">
-                            <div class="text-end">
-                                <h6 class="text-end"><button type="button" class="btn btn-close" data-bs-toggle="modal"
-                                        data-bs-target="#ModalBorrar{{id_notificacion}}"></button></h6>
-                            </div>
-                        </div>
+
+
                     </div>
-                </div>
-            </div>
-            <div class="modal fade" id="Modal{{id_notificacion}}" tabindex="-1" aria-labelledby="exampleModalLabel"
-                aria-hidden="true">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h1 class="modal-title fs-5" id="exampleModalLabel">{{#if
-                                fecha_vencimiento}}Notificación de
-                                Vencimiento{{else}}Notificación de Agotamiento{{/if}}</h1>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-                        <div class="modal-body">
-                            <div class="card-body">
-                                <p class="card-text">{{contenido}}</p>
-                                <p class="card-text">{{#if fecha_vencimiento}}El producto vencerá el día
-                                    {{fecha_vencimiento}}{{/if}}</p>
-                                <h6 class="text-end">{{fecha_noti}}</h6>
-                            </div>
-                        </div>
-                        <div class="modal-footer">
-                            <a href="/inventario?q={{nombre}}" class="btn btn-primary">Ver Producto</a>
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-                        </div>
+
+
+
+                    <!-- ACCIONES -->
+
+                    <div class="notification-actions">
+
+
+                        <button
+
+                            type="button"
+
+                            class="
+                                btn
+                                btn-sm
+                                btn-outline-primary
+                                btn-detail
+                            "
+
+                            data-bs-toggle="modal"
+
+                            data-bs-target="#notificationDetailModal"
+
+                            data-id="{{id_notificacion}}"
+
+                            data-content="{{contenido}}"
+
+                            data-product="{{nombre}}"
+
+                            data-date="{{fecha_noti_mostrar}}"
+
+                            data-expiration="{{fecha_vencimiento_mostrar}}"
+
+                            data-unread="{{#if noLeida}}1{{else}}0{{/if}}"
+
+                        >
+
+                            <i
+                                class="
+                                    fas
+                                    fa-eye
+                                    me-1
+                                "
+                            ></i>
+
+                            Ver
+
+                        </button>
+
+
+
+                        <button
+
+                            type="button"
+
+                            class="
+                                btn
+                                btn-sm
+                                btn-outline-danger
+                                btn-delete-notification
+                            "
+
+                            title="Eliminar"
+
+                            data-bs-toggle="modal"
+
+                            data-bs-target="#deleteNotificationModal"
+
+                            data-id="{{id_notificacion}}"
+
+                        >
+
+                            <i
+                                class="
+                                    fas
+                                    fa-trash
+                                "
+                            ></i>
+
+                        </button>
+
+
                     </div>
-                </div>
-            </div>
-            <div class="modal fade" id="ModalBorrar{{id_notificacion}}" aria-labelledby="exampleModalLabel"
-                aria-hidden="true">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h1 class="modal-title fs-5" id="exampleModalLabel">Eliminar
-                                Notificación
-                            </h1>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-                        <div class="modal-body">
-                            ¿Estás seguro que desea continuar con esta acción?
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Atrás</button>
-                            <a class="btn btn-outline-danger"
-                                href="/notificaciones/eliminarnoti/{{id_notificacion}}">Continuar</a>
-                        </div>
-                    </div>
-                </div>
-            </div>
+
+
+                </article>
+
+
             {{/each}}
-        </div>
-    </div>
-    {{else}}
-    <div class="container">
-        <div class="row mt-5 mb-5">
-            <h2>No hay notificaciones para mostrar</h2>
-        </div>
-    </div>
-    {{/if}}
-</div>
-<script>
-    $(document).ready(function () {
-        // Función para manejar el clic en el botón "Ver Detalle"
-        $('.btn-ver-detalle').on('click', function () {
-            var idNotificacion = $(this).data('id-notificacion');
 
-            // Envía una solicitud AJAX al servidor para actualizar el estado de la notificación
-            $.ajax({
-                url: '/notificaciones/actualizar_estado_notificacion',
-                method: 'POST',
-                data: { idNotificacion: idNotificacion },
-                success: function (response) {
-                    // Aquí puedes realizar alguna acción adicional si es necesario
-                },
-                error: function (xhr, status, error) {
-                    // Manejar el error si es necesario
+
+        </div>
+
+
+
+        <!-- =================================================
+             PAGINACIÓN
+        ================================================== -->
+
+        <div class="notifications-pagination">
+
+
+            <div class="pagination-info">
+
+                Mostrando
+
+                {{paginacion.desde}}
+
+                -
+
+                {{paginacion.hasta}}
+
+                de
+
+                {{paginacion.total}}
+
+                notificaciones
+
+            </div>
+
+
+
+            <div class="pagination-buttons">
+
+
+                <a
+
+                    class="
+                        btn
+                        btn-sm
+                        btn-outline-secondary
+
+                        {{#unless paginacion.tieneAnterior}}
+                            disabled
+                        {{/unless}}
+                    "
+
+                    {{#if paginacion.tieneAnterior}}
+
+                        href="/notificaciones?page={{paginacion.anterior}}"
+
+                    {{/if}}
+
+                >
+
+                    <i
+                        class="
+                            fas
+                            fa-chevron-left
+                        "
+                    ></i>
+
+                </a>
+
+
+
+                {{#each paginacion.paginas}}
+
+
+                    <a
+
+                        href="/notificaciones?page={{numero}}"
+
+                        class="
+                            btn
+                            btn-sm
+
+                            {{#if activa}}
+
+                                btn-primary
+
+                            {{else}}
+
+                                btn-outline-secondary
+
+                            {{/if}}
+                        "
+
+                    >
+
+                        {{numero}}
+
+                    </a>
+
+
+                {{/each}}
+
+
+
+                <a
+
+                    class="
+                        btn
+                        btn-sm
+                        btn-outline-secondary
+
+                        {{#unless paginacion.tieneSiguiente}}
+                            disabled
+                        {{/unless}}
+                    "
+
+                    {{#if paginacion.tieneSiguiente}}
+
+                        href="/notificaciones?page={{paginacion.siguiente}}"
+
+                    {{/if}}
+
+                >
+
+                    <i
+                        class="
+                            fas
+                            fa-chevron-right
+                        "
+                    ></i>
+
+                </a>
+
+
+            </div>
+
+
+        </div>
+
+
+    {{else}}
+
+
+        <!-- =================================================
+             SIN NOTIFICACIONES
+        ================================================== -->
+
+        <div class="notifications-empty">
+
+
+            <div class="notifications-empty-icon">
+
+                <i
+                    class="
+                        far
+                        fa-bell-slash
+                    "
+                ></i>
+
+            </div>
+
+
+            <h4>
+                Todo está al día
+            </h4>
+
+
+            <p class="mb-0">
+
+                No hay notificaciones
+                para mostrar en este momento.
+
+            </p>
+
+
+        </div>
+
+
+    {{/if}}
+
+
+</div>
+
+
+
+<!-- =========================================================
+     MODAL ÚNICO DE DETALLE
+========================================================= -->
+
+<div
+    class="modal fade"
+    id="notificationDetailModal"
+    tabindex="-1"
+    aria-hidden="true"
+>
+
+    <div class="modal-dialog modal-dialog-centered">
+
+        <div class="modal-content">
+
+
+            <div class="modal-header">
+
+
+                <h5 class="modal-title">
+
+                    Detalle de la notificación
+
+                </h5>
+
+
+                <button
+                    type="button"
+                    class="btn-close"
+                    data-bs-dismiss="modal"
+                    aria-label="Cerrar"
+                ></button>
+
+
+            </div>
+
+
+
+            <div class="modal-body">
+
+
+                <div class="notification-detail-icon">
+
+                    <i
+                        class="
+                            fas
+                            fa-bell
+                        "
+                    ></i>
+
+                </div>
+
+
+                <p
+                    id="detailContent"
+                    class="text-center mb-2"
+                ></p>
+
+
+                <div
+                    id="expirationContainer"
+                    class="detail-date"
+                    style="
+                        display: none;
+                    "
+                >
+
+                    <i
+                        class="
+                            far
+                            fa-calendar-alt
+                            me-1
+                        "
+                    ></i>
+
+                    Fecha de vencimiento:
+
+                    <strong
+                        id="detailExpiration"
+                    ></strong>
+
+                </div>
+
+
+                <div
+                    id="detailDateContainer"
+                    class="
+                        text-muted
+                        text-center
+                        small
+                        mt-3
+                    "
+                >
+
+                    Notificación:
+
+                    <span
+                        id="detailDate"
+                    ></span>
+
+                </div>
+
+
+            </div>
+
+
+
+            <div class="modal-footer">
+
+
+                <a
+                    id="viewProductBtn"
+                    href="/inventario"
+                    class="btn btn-primary"
+                >
+
+                    <i
+                        class="
+                            fas
+                            fa-box
+                            me-1
+                        "
+                    ></i>
+
+                    Ver Producto
+
+                </a>
+
+
+                <button
+                    type="button"
+                    class="btn btn-secondary"
+                    data-bs-dismiss="modal"
+                >
+
+                    Cerrar
+
+                </button>
+
+
+            </div>
+
+
+        </div>
+
+    </div>
+
+</div>
+
+
+
+<!-- =========================================================
+     MODAL ÚNICO PARA ELIMINAR
+========================================================= -->
+
+<div
+    class="modal fade"
+    id="deleteNotificationModal"
+    tabindex="-1"
+    aria-hidden="true"
+>
+
+    <div class="modal-dialog modal-dialog-centered">
+
+        <div class="modal-content">
+
+
+            <div class="modal-header">
+
+
+                <h5 class="modal-title">
+
+                    Eliminar Notificación
+
+                </h5>
+
+
+                <button
+                    type="button"
+                    class="btn-close"
+                    data-bs-dismiss="modal"
+                    aria-label="Cerrar"
+                ></button>
+
+
+            </div>
+
+
+
+            <div class="modal-body">
+
+                ¿Está seguro de eliminar
+                esta notificación?
+
+            </div>
+
+
+
+            <div class="modal-footer">
+
+
+                <button
+                    type="button"
+                    class="btn btn-secondary"
+                    data-bs-dismiss="modal"
+                >
+
+                    Cancelar
+
+                </button>
+
+
+                <form
+                    id="deleteNotificationForm"
+                    method="POST"
+                >
+
+                    <button
+                        type="submit"
+                        class="btn btn-danger"
+                    >
+
+                        <i
+                            class="
+                                fas
+                                fa-trash
+                                me-1
+                            "
+                        ></i>
+
+                        Eliminar
+
+                    </button>
+
+                </form>
+
+
+            </div>
+
+
+        </div>
+
+    </div>
+
+</div>
+
+
+
+<script>
+
+document.addEventListener(
+    'DOMContentLoaded',
+    function () {
+
+
+        /* =================================================
+           ELEMENTOS
+        ================================================= */
+
+        const detailModal =
+            document.getElementById(
+                'notificationDetailModal'
+            );
+
+
+        const detailContent =
+            document.getElementById(
+                'detailContent'
+            );
+
+
+        const detailDate =
+            document.getElementById(
+                'detailDate'
+            );
+
+
+        const expirationContainer =
+            document.getElementById(
+                'expirationContainer'
+            );
+
+
+        const detailExpiration =
+            document.getElementById(
+                'detailExpiration'
+            );
+
+
+        const viewProductBtn =
+            document.getElementById(
+                'viewProductBtn'
+            );
+
+
+        const deleteModal =
+            document.getElementById(
+                'deleteNotificationModal'
+            );
+
+
+        const deleteForm =
+            document.getElementById(
+                'deleteNotificationForm'
+            );
+
+
+
+        /* =================================================
+           ACTUALIZAR CONTADOR DE LA CAMPANA
+        ================================================= */
+
+        function disminuirContadorCampana() {
+
+
+            const contador =
+                document.getElementById(
+                    'notificationCount'
+                );
+
+
+            if (!contador) {
+                return;
+            }
+
+
+            const actual =
+                Number(
+                    contador.textContent
+                ) || 0;
+
+
+            const nuevo =
+                Math.max(
+                    0,
+                    actual - 1
+                );
+
+
+            if (
+                nuevo === 0
+            ) {
+
+                contador.textContent =
+                    '';
+
+                contador.style.display =
+                    'none';
+
+            }
+
+            else {
+
+                contador.textContent =
+                    nuevo;
+
+                contador.style.display =
+                    '';
+
+            }
+
+        }
+
+
+
+        /* =================================================
+           MARCAR VISUALMENTE COMO LEÍDA
+        ================================================= */
+
+        function marcarVisualmenteLeida(
+            id
+        ) {
+
+
+            const notificacion =
+                document.getElementById(
+                    `notification-${id}`
+                );
+
+
+            if (!notificacion) {
+                return;
+            }
+
+
+            notificacion
+                .classList
+                .remove(
+                    'unread'
+                );
+
+
+            const badge =
+                notificacion.querySelector(
+                    '.new-badge'
+                );
+
+
+            if (badge) {
+
+                badge.remove();
+
+            }
+
+
+            const boton =
+                notificacion.querySelector(
+                    '.btn-detail'
+                );
+
+
+            if (boton) {
+
+                boton.dataset.unread =
+                    '0';
+
+            }
+
+        }
+
+
+
+        /* =================================================
+           ABRIR DETALLE
+        ================================================= */
+
+        detailModal.addEventListener(
+            'show.bs.modal',
+            async function (event) {
+
+
+                const boton =
+                    event.relatedTarget;
+
+
+                if (!boton) {
+                    return;
                 }
-            });
-        });
-        $('[id^="Modal"]').on('hidden.bs.modal', function () {
-            // Recargar la página para refrescar las notificaciones
-            location.reload();
-        });
-    });
+
+
+                const id =
+                    boton.dataset.id;
+
+
+                const contenido =
+                    boton.dataset.content ||
+                    '';
+
+
+                const producto =
+                    boton.dataset.product ||
+                    '';
+
+
+                const fecha =
+                    boton.dataset.date ||
+                    '';
+
+
+                const vencimiento =
+                    boton.dataset.expiration ||
+                    '';
+
+
+                const estabaNoLeida =
+                    boton.dataset.unread ===
+                    '1';
+
+
+
+                /* =========================================
+                   LLENAR MODAL
+                ========================================= */
+
+                detailContent.textContent =
+                    contenido;
+
+
+                detailDate.textContent =
+                    fecha || 'Sin fecha';
+
+
+                if (
+                    vencimiento
+                ) {
+
+                    detailExpiration.textContent =
+                        vencimiento;
+
+
+                    expirationContainer.style.display =
+                        '';
+
+                }
+
+                else {
+
+                    detailExpiration.textContent =
+                        '';
+
+
+                    expirationContainer.style.display =
+                        'none';
+
+                }
+
+
+
+                if (
+                    producto
+                ) {
+
+                    viewProductBtn.style.display =
+                        '';
+
+
+                    viewProductBtn.href =
+                        `/inventario?q=${
+                            encodeURIComponent(
+                                producto
+                            )
+                        }`;
+
+                }
+
+                else {
+
+                    viewProductBtn.style.display =
+                        'none';
+
+                }
+
+
+
+                /* =========================================
+                   MARCAR COMO LEÍDA
+                ========================================= */
+
+                if (
+                    !estabaNoLeida
+                ) {
+
+                    return;
+
+                }
+
+
+                try {
+
+                    const response =
+                        await fetch(
+                            '/notificaciones/actualizar_estado_notificacion',
+                            {
+
+                                method:
+                                    'POST',
+
+                                headers: {
+
+                                    'Content-Type':
+                                        'application/json',
+
+                                    'Accept':
+                                        'application/json'
+
+                                },
+
+                                body:
+                                    JSON.stringify({
+
+                                        idNotificacion:
+                                            id
+
+                                    })
+
+                            }
+                        );
+
+
+                    if (!response.ok) {
+
+                        return;
+
+                    }
+
+
+                    const data =
+                        await response.json();
+
+
+                    if (
+                        data.actualizada
+                    ) {
+
+                        marcarVisualmenteLeida(
+                            id
+                        );
+
+
+                        disminuirContadorCampana();
+
+                    }
+
+
+                } catch (error) {
+
+                    console.error(
+                        'No se pudo marcar la notificación como leída:',
+                        error
+                    );
+
+                }
+
+
+            }
+        );
+
+
+
+        /* =================================================
+           ELIMINAR
+        ================================================= */
+
+        deleteModal.addEventListener(
+            'show.bs.modal',
+            function (event) {
+
+
+                const boton =
+                    event.relatedTarget;
+
+
+                if (!boton) {
+                    return;
+                }
+
+
+                const id =
+                    boton.dataset.id;
+
+
+                deleteForm.action =
+                    `/notificaciones/eliminar/${
+                        encodeURIComponent(
+                            id
+                        )
+                    }`;
+
+            }
+        );
+
+
+    }
+);
+
 </script>

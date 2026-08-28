@@ -59,11 +59,14 @@ app.use(helmet.hidePoweredBy());
 
 //Variables globales
 app.use((req, res, next) => {
-    app.locals.success = req.flash('success',);
-    app.locals.message = req.flash('message',);
-    app.locals.noti = req.flash('noti',);
-    app.locals.user = req.user;
+
+    res.locals.success = req.flash('success');
+    res.locals.message = req.flash('message');
+    res.locals.noti = req.flash('noti');
+    res.locals.user = req.user || null;
+
     next();
+
 });
 
 //Rutas

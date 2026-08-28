@@ -1,118 +1,2588 @@
-<div class="container text-center mt-4">
-    <a href="/inventario" class="text-dark" style="text-decoration: none;">
-        <h2>Inventario de Productos</h2>
-    </a>
-    <form action="/inventario" method="GET" class="mb-3">
-        <div class="input-group mt-4 mb-4">
-            <input id="searchInput" type="text" class="form-control" placeholder="Buscar producto" name="q" autofocus>
-            <button class="btn btn-primary" type="submit">Buscar</button>
+<style>
+
+    .inventory-page {
+        max-width: 1240px;
+        margin: 0 auto;
+        padding: 20px 14px 40px;
+    }
+
+
+    /* =====================================================
+       CABECERA
+    ====================================================== */
+
+    .inventory-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+
+        gap: 12px;
+        flex-wrap: wrap;
+
+        margin-bottom: 14px;
+    }
+
+
+    .inventory-title {
+        margin: 0;
+        font-size: 1.55rem;
+    }
+
+
+    .inventory-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+
+    /* =====================================================
+       BUSCADOR
+    ====================================================== */
+
+    .inventory-search-card {
+        background: #fff;
+
+        border: 1px solid #dee2e6;
+        border-radius: 10px;
+
+        padding: 12px;
+
+        margin-bottom: 12px;
+    }
+
+
+    .inventory-search-row {
+        display: grid;
+
+        grid-template-columns:
+            minmax(0, 1fr)
+            auto;
+
+        gap: 8px;
+
+        align-items: center;
+    }
+
+
+    .inventory-search-wrapper {
+        position: relative;
+    }
+
+
+    .inventory-search-wrapper .search-icon {
+
+        position: absolute;
+
+        left: 13px;
+
+        top: 50%;
+
+        transform:
+            translateY(-50%);
+
+        color: #6c757d;
+
+        pointer-events: none;
+    }
+
+
+    #searchInput {
+        padding-left: 38px;
+
+        min-height: 43px;
+    }
+
+
+    .search-meta {
+
+        min-height: 20px;
+
+        margin-top: 7px;
+
+        display: flex;
+
+        justify-content:
+            space-between;
+
+        align-items: center;
+
+        gap: 8px;
+
+        flex-wrap: wrap;
+
+        font-size: .82rem;
+
+        color: #6c757d;
+    }
+
+
+    /* =====================================================
+       LEYENDA
+    ====================================================== */
+
+    .inventory-legend {
+
+        display: flex;
+
+        gap: 10px;
+
+        flex-wrap: wrap;
+
+        margin-bottom: 12px;
+
+        font-size: .8rem;
+
+        color: #6c757d;
+    }
+
+
+    .legend-item {
+
+        display: inline-flex;
+
+        align-items: center;
+
+        gap: 5px;
+    }
+
+
+    .legend-dot {
+
+        width: 10px;
+
+        height: 10px;
+
+        border-radius: 50%;
+
+        display: inline-block;
+    }
+
+
+    .legend-green {
+        background: #198754;
+    }
+
+
+    .legend-yellow {
+        background: #ffc107;
+    }
+
+
+    .legend-red {
+        background: #dc3545;
+    }
+
+
+    /* =====================================================
+       TABLA / LISTA
+    ====================================================== */
+
+    .inventory-shell {
+
+        background: #fff;
+
+        border:
+            1px solid #dee2e6;
+
+        border-radius: 10px;
+
+        overflow: hidden;
+    }
+
+
+    .inventory-header,
+    .inventory-row {
+
+        display: grid;
+
+        grid-template-columns:
+            minmax(190px, 1.9fr)
+            minmax(105px, .75fr)
+            minmax(170px, 1.35fr)
+            minmax(170px, 1.35fr)
+            minmax(105px, .75fr);
+
+        gap: 10px;
+
+        align-items: center;
+    }
+
+
+    /*
+     * Usuario no administrador:
+     * no tiene columna de precio de compra.
+     */
+
+    .inventory-header.no-purchase,
+    .inventory-row.no-purchase {
+
+        grid-template-columns:
+            minmax(190px, 2fr)
+            minmax(105px, .8fr)
+            minmax(190px, 1.5fr)
+            minmax(105px, .8fr);
+    }
+
+
+    .inventory-header {
+
+        padding: 10px 14px;
+
+        background: #f8f9fa;
+
+        border-bottom:
+            1px solid #dee2e6;
+
+        color: #6c757d;
+
+        font-size: .78rem;
+
+        font-weight: 700;
+    }
+
+
+    .inventory-row {
+
+        position: relative;
+
+        padding: 11px 14px;
+
+        border-bottom:
+            1px solid #eeeeee;
+
+        transition:
+            background-color
+            .15s ease;
+    }
+
+
+    .inventory-row:last-child {
+        border-bottom: 0;
+    }
+
+
+    .inventory-row:hover {
+        background: #fafafa;
+    }
+
+
+    /*
+     * Barra de estado.
+     */
+
+    .inventory-row::before {
+
+        content: '';
+
+        position: absolute;
+
+        left: 0;
+
+        top: 0;
+
+        bottom: 0;
+
+        width: 4px;
+    }
+
+
+    .inventory-row.status-1::before {
+        background: #198754;
+    }
+
+
+    .inventory-row.status-2::before {
+        background: #ffc107;
+    }
+
+
+    .inventory-row.status-3::before {
+        background: #dc3545;
+    }
+
+
+    /* =====================================================
+       PRODUCTO
+    ====================================================== */
+
+    .product-name {
+
+        min-width: 0;
+
+        font-weight: 650;
+
+        line-height: 1.25;
+
+        overflow-wrap: anywhere;
+    }
+
+
+    .product-state {
+
+        display: inline-flex;
+
+        align-items: center;
+
+        gap: 5px;
+
+        margin-top: 5px;
+
+        font-size: .75rem;
+
+        font-weight: 500;
+    }
+
+
+    .status-badge {
+
+        display: inline-flex;
+
+        align-items: center;
+
+        justify-content: center;
+
+        padding:
+            3px 7px;
+
+        border-radius: 999px;
+    }
+
+
+    .status-badge.status-1 {
+
+        color: #146c43;
+
+        background: #d1e7dd;
+    }
+
+
+    .status-badge.status-2 {
+
+        color: #7a5a00;
+
+        background: #fff3cd;
+    }
+
+
+    .status-badge.status-3 {
+
+        color: #842029;
+
+        background: #f8d7da;
+    }
+
+
+    /* =====================================================
+       INVENTARIO
+    ====================================================== */
+
+    .stock-value {
+
+        font-size: 1.05rem;
+
+        font-weight: 700;
+    }
+
+
+    .stock-limit {
+
+        display: block;
+
+        margin-top: 2px;
+
+        color: #6c757d;
+
+        font-size: .72rem;
+    }
+
+
+    /* =====================================================
+       PRECIOS
+    ====================================================== */
+
+    .price-select {
+
+        min-height: 37px;
+
+        font-size: .85rem;
+    }
+
+
+    .empty-price {
+
+        color: #6c757d;
+
+        font-size: .82rem;
+    }
+
+
+    .mobile-label {
+
+        display: none;
+
+        margin-bottom: 4px;
+
+        color: #6c757d;
+
+        font-size: .72rem;
+
+        font-weight: 700;
+
+        text-transform: uppercase;
+    }
+
+
+    /* =====================================================
+       LOTES
+    ====================================================== */
+
+    .lot-details {
+        margin-top: 7px;
+    }
+
+
+    .lot-details summary {
+
+        width: fit-content;
+
+        cursor: pointer;
+
+        color: #6c757d;
+
+        font-size: .76rem;
+
+        user-select: none;
+    }
+
+
+    .lot-list {
+
+        margin:
+            7px 0 0;
+
+        padding-left: 18px;
+
+        color: #6c757d;
+
+        font-size: .78rem;
+    }
+
+
+    /* =====================================================
+       ESTADOS DE CARGA
+    ====================================================== */
+
+    .inventory-loading,
+    .inventory-empty,
+    .inventory-error {
+
+        padding:
+            42px 16px;
+
+        text-align: center;
+
+        color: #6c757d;
+    }
+
+
+    .inventory-loading
+    .spinner-border {
+
+        width: 1.6rem;
+
+        height: 1.6rem;
+
+        margin-bottom: 9px;
+    }
+
+
+    .inventory-error {
+        color: #842029;
+    }
+
+
+    /* =====================================================
+       PAGINACIÓN
+    ====================================================== */
+
+    .pagination-zone {
+
+        padding:
+            12px 14px;
+
+        border-top:
+            1px solid #dee2e6;
+
+        background: #fff;
+    }
+
+
+    .pagination-row {
+
+        display: flex;
+
+        justify-content:
+            space-between;
+
+        align-items: center;
+
+        gap: 12px;
+
+        flex-wrap: wrap;
+    }
+
+
+    .pagination-info {
+
+        color: #6c757d;
+
+        font-size: .82rem;
+    }
+
+
+    .pagination-buttons {
+
+        display: flex;
+
+        gap: 6px;
+
+        align-items: center;
+
+        flex-wrap: wrap;
+    }
+
+
+    .page-number {
+        min-width: 36px;
+    }
+
+
+    /* =====================================================
+       TABLET
+    ====================================================== */
+
+    @media (
+        max-width: 900px
+    ) {
+
+        .inventory-header {
+            display: none;
+        }
+
+
+        .inventory-shell {
+
+            background: transparent;
+
+            border: 0;
+
+            border-radius: 0;
+
+            overflow: visible;
+        }
+
+
+        #inventoryRows {
+
+            display: grid;
+
+            grid-template-columns:
+                repeat(
+                    2,
+                    minmax(0, 1fr)
+                );
+
+            gap: 10px;
+        }
+
+
+        .inventory-row,
+        .inventory-row.no-purchase {
+
+            display: grid;
+
+            grid-template-columns:
+                1fr
+                1fr;
+
+            gap: 11px;
+
+            align-items: start;
+
+            padding: 14px;
+
+            background: #fff;
+
+            border:
+                1px solid #dee2e6;
+
+            border-radius: 10px;
+
+            overflow: visible;
+        }
+
+
+        .inventory-row
+        > .product-main {
+
+            grid-column:
+                1 / -1;
+        }
+
+
+        .inventory-row
+        > .inventory-actions-cell {
+
+            grid-column:
+                1 / -1;
+        }
+
+
+        .mobile-label {
+            display: block;
+        }
+
+
+        .pagination-zone {
+
+            margin-top: 10px;
+
+            border:
+                1px solid #dee2e6;
+
+            border-radius: 10px;
+        }
+
+    }
+
+
+    /* =====================================================
+       TELÉFONO
+    ====================================================== */
+
+    @media (
+        max-width: 620px
+    ) {
+
+        .inventory-page {
+
+            padding:
+                12px 8px 30px;
+        }
+
+
+        .inventory-title {
+            font-size: 1.3rem;
+        }
+
+
+        .inventory-toolbar,
+        .inventory-search-row {
+
+            display: grid;
+
+            grid-template-columns:
+                1fr;
+        }
+
+
+        .inventory-actions {
+
+            display: grid;
+
+            grid-template-columns:
+                1fr 1fr;
+
+            width: 100%;
+        }
+
+
+        #inventoryRows {
+            grid-template-columns: 1fr;
+        }
+
+
+        .inventory-row,
+        .inventory-row.no-purchase {
+
+            grid-template-columns:
+                1fr 1fr;
+        }
+
+
+        .pagination-row {
+
+            justify-content: center;
+
+            text-align: center;
+        }
+
+
+        .pagination-info {
+            width: 100%;
+        }
+
+
+        .pagination-buttons {
+
+            justify-content: center;
+
+            width: 100%;
+        }
+
+    }
+
+</style>
+
+
+
+<div class="inventory-page">
+
+
+    <!-- =====================================================
+         CABECERA
+    ====================================================== -->
+
+    <div class="inventory-toolbar">
+
+
+        <h2 class="inventory-title">
+            Inventario de Productos
+        </h2>
+
+
+        <div class="inventory-actions">
+
+
+            {{#ifvalue user.tipo value=1}}
+
+
+                <a
+                    href="/inventario/unidades"
+                    class="
+                        btn
+                        btn-outline-secondary
+                        btn-sm
+                    "
+                >
+
+                    <i
+                        class="
+                            fas
+                            fa-ruler-combined
+                            me-1
+                        "
+                    ></i>
+
+                    Unidades
+
+                </a>
+
+
+                <a
+                    href="/inventario/add"
+                    class="
+                        btn
+                        btn-primary
+                        btn-sm
+                    "
+                >
+
+                    <i
+                        class="
+                            fas
+                            fa-plus
+                            me-1
+                        "
+                    ></i>
+
+                    Nuevo Producto
+
+                </a>
+
+
+            {{/ifvalue}}
+
+
         </div>
-    </form>
-    <div class="table-responsive">
-        {{#if productos}}
-        <table class="table table-striped-columns">
-            <thead>
-                <tr>
-                    <th>Nombre</th>
-                    <th>Inventario</th>
-                    <th>Precio de Venta</th>
-                    {{#ifvalue user.tipo value=1}}<th>Precio de Compra</th>
-                    <th>Editar</th>
-                    {{/ifvalue}}
-                </tr>
-            </thead>
-            <tbody class="table-group-divider">
-                {{#each productos}}
-                <tr {{#ifvalue estado_producto value=1}}class="table-success" {{/ifvalue}} {{#ifvalue estado_producto
-                    value=2}}class="table-warning" {{/ifvalue}} {{#ifvalue estado_producto value=3}}class="table-danger"
-                    {{/ifvalue}}>
-                    <td>{{nombre_producto}}</td>
-                    <td>
-                        <select class="form-select">
-                            <option>Inventario Total: {{inventarioTotal}}</option>
-                            {{#each fechasVencimiento}}
-                            <option>Inventario: {{inventario}} ({{fecha_vencimiento}})
-                            </option>
-                            {{/each}}
-                        </select>
-                    </td>
-                    <td>
-                        <select class="form-select">
-                            {{#each preciosventa}}
-                            <option>S/. {{id_precio}}{{precio_venta}} ({{unidad}})
-                            </option>
-                            {{/each}}
-                        </select>
-                    </td>
-                    {{#ifvalue ../user.tipo value=1}}
-                    <td>
-                        <select class="form-select">
-                            {{#each precioscompra}}
-                            <option>S/. {{precio_compra}} ({{unidad}})
-                            </option>
-                            {{/each}}
-                        </select>
-                    </td>
-                    <td><a class="btn btn-outline-primary" href="/inventario/edit/{{id_producto}}">Editar</a>
-                    </td>
-                    {{/ifvalue}}
-                </tr>
-                {{/each}}
-            </tbody>
-        </table>
-        {{else}}
-        <div class="container">
-            <div class="row mt-5">
-                <h2>No hay productos para mostrar</h2>
-            </div>
-        </div>
-        {{/if}}
+
+
     </div>
+
+
+
+    <!-- =====================================================
+         BUSCADOR
+    ====================================================== -->
+
+    <div class="inventory-search-card">
+
+
+        <div class="inventory-search-row">
+
+
+            <div class="inventory-search-wrapper">
+
+
+                <i
+                    class="
+                        fas
+                        fa-search
+                        search-icon
+                    "
+                ></i>
+
+
+                <input
+                    id="searchInput"
+                    type="text"
+                    class="form-control"
+                    placeholder="Buscar por nombre o escanear código de barras..."
+                    autocomplete="off"
+                    autofocus
+                >
+
+
+            </div>
+
+
+            <button
+                id="clearSearchBtn"
+                type="button"
+                class="
+                    btn
+                    btn-outline-secondary
+                "
+                style="
+                    display: none;
+                "
+            >
+
+                <i
+                    class="
+                        fas
+                        fa-times
+                        me-1
+                    "
+                ></i>
+
+                Limpiar
+
+            </button>
+
+
+        </div>
+
+
+
+        <div class="search-meta">
+
+
+            <span id="searchStatus">
+
+                Cargando inventario...
+
+            </span>
+
+
+            <span>
+
+                <i
+                    class="
+                        fas
+                        fa-barcode
+                        me-1
+                    "
+                ></i>
+
+                El lector puede escribir directamente
+                en este campo.
+
+            </span>
+
+
+        </div>
+
+
+    </div>
+
+
+
+    <!-- =====================================================
+         LEYENDA
+    ====================================================== -->
+
+    <div class="inventory-legend">
+
+
+        <span class="legend-item">
+
+            <span
+                class="
+                    legend-dot
+                    legend-green
+                "
+            ></span>
+
+            Disponible
+
+        </span>
+
+
+        <span class="legend-item">
+
+            <span
+                class="
+                    legend-dot
+                    legend-yellow
+                "
+            ></span>
+
+            Bajas existencias
+
+        </span>
+
+
+        <span class="legend-item">
+
+            <span
+                class="
+                    legend-dot
+                    legend-red
+                "
+            ></span>
+
+            Agotado
+
+        </span>
+
+
+    </div>
+
+
+
+    <!-- =====================================================
+         INVENTARIO
+    ====================================================== -->
+
+    <div class="inventory-shell">
+
+
+        <div
+            id="inventoryHeader"
+            class="inventory-header"
+        >
+
+            <div>
+                Producto
+            </div>
+
+            <div>
+                Inventario
+            </div>
+
+            <div>
+                Precio de Venta
+            </div>
+
+            <div id="purchaseHeader">
+                Precio de Compra
+            </div>
+
+            <div class="text-end">
+                Acción
+            </div>
+
+        </div>
+
+
+
+        <!-- =================================================
+             FILAS DINÁMICAS
+        ================================================== -->
+
+        <div id="inventoryRows">
+
+
+            <div class="inventory-loading">
+
+
+                <div
+                    class="spinner-border"
+                    role="status"
+                    aria-hidden="true"
+                ></div>
+
+
+                <div>
+                    Cargando productos...
+                </div>
+
+
+            </div>
+
+
+        </div>
+
+
+
+        <!-- =================================================
+             PAGINACIÓN
+        ================================================== -->
+
+        <div
+            id="paginationZone"
+            class="pagination-zone"
+            style="
+                display: none;
+            "
+        >
+
+
+            <div class="pagination-row">
+
+
+                <div
+                    id="paginationInfo"
+                    class="pagination-info"
+                ></div>
+
+
+                <div
+                    id="paginationButtons"
+                    class="pagination-buttons"
+                ></div>
+
+
+            </div>
+
+
+        </div>
+
+
+    </div>
+
+
 </div>
+
+
+
 <script>
-    document.getElementById('searchInput').addEventListener('keyup', function () {
-        const query = this.value.trim(); // Obtener el valor del campo de búsqueda
-        fetch(`/productos?q=${query}`) // Realizar solicitud AJAX con el término de búsqueda
-            .then(response => response.json())
-            .then(data => {
-                // Actualizar la tabla de productos con los resultados de la búsqueda
-                const productosTableBody = document.getElementById('productosTableBody');
-                productosTableBody.innerHTML = '';
-                data.forEach(producto => {
-                    const row = `
-                        <tr>
-                            <td><img src="${producto.imagen}" alt="${producto.nombre_producto}" width="50"></td>
-                            <td>${producto.nombre_producto}</td>
-                            <td>
-                                <select class="form-select">
-                                    <option>Inventario Total: ${producto.inventarioTotal}</option>
-                                    ${producto.fechasVencimiento.map(fecha => `
-                                        <option>Inventario: ${fecha.inventario} (${fecha.fecha_vencimiento})</option>
-                                    `).join('')}
-                                </select>
-                            </td>
-                            <td>
-                                <select class="form-select">
-                                    ${producto.preciosventa.map(precio => `
-                                        <option>S/. ${precio.precio_venta} (${precio.unidad})</option>
-                                    `).join('')}
-                                </select>
-                            </td>
-                            ${producto.precioscompra ? `
-                                <td>
-                                    <select class="form-select">
-                                        ${producto.precioscompra.map(precio => `
-                                            <option>S/. ${precio.precio_compra} (${precio.unidad})</option>
-                                        `).join('')}
-                                    </select>
-                                </td>
-                                <td><a class="btn btn-outline-primary" href="/inventario/edit/${producto.id_producto}">Editar</a></td>
-                            ` : ''}
-                        </tr>
-                    `;
-                    productosTableBody.innerHTML += row;
-                });
-            })
-            .catch(error => console.error('Error al realizar la solicitud AJAX:', error));
-    });
+
+document.addEventListener(
+    'DOMContentLoaded',
+    function () {
+
+
+        /* =================================================
+           ELEMENTOS
+        ================================================= */
+
+        const searchInput =
+            document.getElementById(
+                'searchInput'
+            );
+
+
+        const clearSearchBtn =
+            document.getElementById(
+                'clearSearchBtn'
+            );
+
+
+        const searchStatus =
+            document.getElementById(
+                'searchStatus'
+            );
+
+
+        const inventoryRows =
+            document.getElementById(
+                'inventoryRows'
+            );
+
+
+        const inventoryHeader =
+            document.getElementById(
+                'inventoryHeader'
+            );
+
+
+        const purchaseHeader =
+            document.getElementById(
+                'purchaseHeader'
+            );
+
+
+        const paginationZone =
+            document.getElementById(
+                'paginationZone'
+            );
+
+
+        const paginationInfo =
+            document.getElementById(
+                'paginationInfo'
+            );
+
+
+        const paginationButtons =
+            document.getElementById(
+                'paginationButtons'
+            );
+
+
+
+        /* =================================================
+           ESTADO
+        ================================================= */
+
+        let paginaActual =
+            1;
+
+
+        let terminoActual =
+            '';
+
+
+        let timerBusqueda =
+            null;
+
+
+        let numeroPeticion =
+            0;
+
+
+        let esAdmin =
+            false;
+
+
+
+        /* =================================================
+           ESCAPAR HTML
+        ================================================= */
+
+        function escaparHtml(
+            valor
+        ) {
+
+            return String(
+                valor ?? ''
+            )
+                .replaceAll(
+                    '&',
+                    '&amp;'
+                )
+                .replaceAll(
+                    '<',
+                    '&lt;'
+                )
+                .replaceAll(
+                    '>',
+                    '&gt;'
+                )
+                .replaceAll(
+                    '"',
+                    '&quot;'
+                )
+                .replaceAll(
+                    "'",
+                    '&#039;'
+                );
+
+        }
+
+
+
+        /* =================================================
+           FORMATO DE NÚMERO
+        ================================================= */
+
+        function formatoNumero(
+            valor
+        ) {
+
+            const numero =
+                Number(
+                    valor
+                ) || 0;
+
+
+            return numero
+                .toLocaleString(
+                    'es-PE',
+                    {
+                        minimumFractionDigits:
+                            Number.isInteger(
+                                numero
+                            )
+                                ?
+                                0
+                                :
+                                3,
+
+                        maximumFractionDigits:
+                            3
+                    }
+                );
+
+        }
+
+
+
+        /* =================================================
+           FORMATO MONEDA
+        ================================================= */
+
+        function formatoMoneda(
+            valor
+        ) {
+
+            return Number(
+                valor || 0
+            )
+                .toLocaleString(
+                    'es-PE',
+                    {
+                        minimumFractionDigits:
+                            2,
+
+                        maximumFractionDigits:
+                            2
+                    }
+                );
+
+        }
+
+
+
+        /* =================================================
+           TEXTO ESTADO
+        ================================================= */
+
+        function textoEstado(
+            estado
+        ) {
+
+            const numero =
+                Number(
+                    estado
+                );
+
+
+            if (
+                numero === 2
+            ) {
+
+                return 'Bajas existencias';
+
+            }
+
+
+            if (
+                numero === 3
+            ) {
+
+                return 'Agotado';
+
+            }
+
+
+            return 'Disponible';
+
+        }
+
+
+
+        /* =================================================
+           ACTUALIZAR URL
+        ================================================= */
+
+        function actualizarUrl() {
+
+            const url =
+                new URL(
+                    window.location.href
+                );
+
+
+            if (terminoActual) {
+
+                url.searchParams.set(
+                    'q',
+                    terminoActual
+                );
+
+            }
+
+            else {
+
+                url.searchParams.delete(
+                    'q'
+                );
+
+            }
+
+
+            if (
+                paginaActual > 1
+            ) {
+
+                url.searchParams.set(
+                    'page',
+                    paginaActual
+                );
+
+            }
+
+            else {
+
+                url.searchParams.delete(
+                    'page'
+                );
+
+            }
+
+
+            window.history.replaceState(
+                null,
+                '',
+                url
+            );
+
+        }
+
+
+
+        /* =================================================
+           SELECT DE PRECIOS
+        ================================================= */
+
+        function crearSelectPrecio(
+            precios,
+            tipo
+        ) {
+
+            if (
+                !Array.isArray(
+                    precios
+                ) ||
+
+                precios.length === 0
+            ) {
+
+                return `
+                    <span class="empty-price">
+                        Sin precio registrado
+                    </span>
+                `;
+
+            }
+
+
+
+            const opciones =
+                precios
+                    .map(
+                        precio => {
+
+                            const valor =
+                                tipo === 'compra'
+
+                                    ?
+                                    precio.precio_compra
+
+                                    :
+                                    precio.precio_venta;
+
+
+
+                            const codigo =
+                                precio.codigo_barras
+
+                                    ?
+                                    ` · ${escaparHtml(
+                                        precio.codigo_barras
+                                    )}`
+
+                                    :
+                                    '';
+
+
+
+                            return `
+                                <option>
+                                    S/. ${formatoMoneda(valor)}
+                                    ·
+                                    ${escaparHtml(precio.unidad)}
+                                    ${codigo}
+                                </option>
+                            `;
+
+                        }
+                    )
+                    .join('');
+
+
+
+            return `
+                <select
+                    class="
+                        form-select
+                        price-select
+                    "
+                    aria-label="Precios del producto"
+                >
+
+                    ${opciones}
+
+                </select>
+            `;
+
+        }
+
+
+
+        /* =================================================
+           LOTES
+        ================================================= */
+
+        function crearLotes(
+            producto
+        ) {
+
+            const lotes =
+                Array.isArray(
+                    producto.fechasVencimiento
+                )
+
+                    ?
+                    producto.fechasVencimiento
+
+                    :
+                    [];
+
+
+            if (
+                lotes.length === 0
+            ) {
+
+                return `
+                    <div class="stock-limit">
+                        Sin lotes registrados
+                    </div>
+                `;
+
+            }
+
+
+
+            const items =
+                lotes
+                    .map(
+                        lote => `
+                            <li>
+
+                                ${formatoNumero(
+                                    lote.inventario
+                                )}
+
+                                ·
+
+                                ${escaparHtml(
+                                    lote.fecha_vencimiento
+                                )}
+
+                            </li>
+                        `
+                    )
+                    .join('');
+
+
+
+            return `
+                <details class="lot-details">
+
+                    <summary>
+
+                        ${lotes.length}
+
+                        ${
+                            lotes.length === 1
+                                ?
+                                'lote'
+                                :
+                                'lotes'
+                        }
+
+                    </summary>
+
+                    <ul class="lot-list">
+
+                        ${items}
+
+                    </ul>
+
+                </details>
+            `;
+
+        }
+
+
+
+        /* =================================================
+           RENDER PRODUCTOS
+        ================================================= */
+
+        function renderProductos(
+            productos
+        ) {
+
+            if (
+                !Array.isArray(
+                    productos
+                ) ||
+
+                productos.length === 0
+            ) {
+
+                inventoryRows.innerHTML = `
+                    <div class="inventory-empty">
+
+                        <i
+                            class="
+                                fas
+                                fa-box-open
+                                fa-2x
+                                mb-2
+                            "
+                        ></i>
+
+                        <div>
+                            No se encontraron productos.
+                        </div>
+
+                    </div>
+                `;
+
+
+                return;
+
+            }
+
+
+
+            inventoryRows.innerHTML =
+                productos
+                    .map(
+                        producto => {
+
+
+                            const estado =
+                                Number(
+                                    producto.estado_producto
+                                ) || 1;
+
+
+
+                            const precioCompra =
+                                esAdmin
+
+                                    ?
+                                    `
+                                        <div>
+
+                                            <span class="mobile-label">
+                                                Precio de Compra
+                                            </span>
+
+                                            ${crearSelectPrecio(
+                                                producto.precioscompra,
+                                                'compra'
+                                            )}
+
+                                        </div>
+                                    `
+
+                                    :
+                                    '';
+
+
+
+                            const accion =
+                                esAdmin
+
+                                    ?
+                                    `
+                                        <a
+                                            class="
+                                                btn
+                                                btn-sm
+                                                btn-outline-primary
+                                                w-100
+                                            "
+                                            href="/inventario/edit/${Number(
+                                                producto.id_producto
+                                            )}"
+                                        >
+
+                                            <i
+                                                class="
+                                                    fas
+                                                    fa-pen
+                                                    me-1
+                                                "
+                                            ></i>
+
+                                            Editar
+
+                                        </a>
+                                    `
+
+                                    :
+                                    `
+                                        <span
+                                            class="
+                                                text-muted
+                                                small
+                                            "
+                                        >
+                                            Solo lectura
+                                        </span>
+                                    `;
+
+
+
+                            return `
+                                <div
+                                    class="
+                                        inventory-row
+                                        status-${estado}
+                                        ${
+                                            esAdmin
+                                                ?
+                                                ''
+                                                :
+                                                'no-purchase'
+                                        }
+                                    "
+                                >
+
+
+                                    <!-- PRODUCTO -->
+
+                                    <div class="product-main">
+
+
+                                        <div class="product-name">
+
+                                            ${escaparHtml(
+                                                producto.nombre_producto
+                                            )}
+
+                                        </div>
+
+
+                                        <div class="product-state">
+
+                                            <span
+                                                class="
+                                                    status-badge
+                                                    status-${estado}
+                                                "
+                                            >
+
+                                                ${textoEstado(
+                                                    estado
+                                                )}
+
+                                            </span>
+
+                                        </div>
+
+
+                                    </div>
+
+
+
+                                    <!-- INVENTARIO -->
+
+                                    <div>
+
+
+                                        <span class="mobile-label">
+                                            Inventario
+                                        </span>
+
+
+                                        <div class="stock-value">
+
+                                            ${formatoNumero(
+                                                producto.inventarioTotal
+                                            )}
+
+                                        </div>
+
+
+                                        <span class="stock-limit">
+
+                                            Límite:
+                                            ${formatoNumero(
+                                                producto.cantidad_limite
+                                            )}
+
+                                        </span>
+
+
+                                        ${crearLotes(
+                                            producto
+                                        )}
+
+
+                                    </div>
+
+
+
+                                    <!-- PRECIO VENTA -->
+
+                                    <div>
+
+
+                                        <span class="mobile-label">
+                                            Precio de Venta
+                                        </span>
+
+
+                                        ${crearSelectPrecio(
+                                            producto.preciosventa,
+                                            'venta'
+                                        )}
+
+
+                                    </div>
+
+
+
+                                    <!-- PRECIO COMPRA -->
+
+                                    ${precioCompra}
+
+
+
+                                    <!-- ACCIÓN -->
+
+                                    <div
+                                        class="
+                                            inventory-actions-cell
+                                            text-end
+                                        "
+                                    >
+
+                                        ${accion}
+
+                                    </div>
+
+
+                                </div>
+                            `;
+
+                        }
+                    )
+                    .join('');
+
+        }
+
+
+
+        /* =================================================
+           CREAR BOTÓN DE PÁGINA
+        ================================================= */
+
+        function crearBotonPagina({
+
+            texto,
+            pagina,
+            activo = false,
+            deshabilitado = false,
+            clase = ''
+
+        }) {
+
+            const boton =
+                document.createElement(
+                    'button'
+                );
+
+
+            boton.type =
+                'button';
+
+
+            boton.className =
+                `btn btn-sm ${
+                    activo
+
+                        ?
+                        'btn-primary'
+
+                        :
+                        'btn-outline-secondary'
+                } ${clase}`;
+
+
+            boton.textContent =
+                texto;
+
+
+            boton.disabled =
+                deshabilitado;
+
+
+            if (
+                !deshabilitado &&
+                !activo
+            ) {
+
+                boton.addEventListener(
+                    'click',
+                    () => {
+
+                        cargarInventario(
+                            pagina,
+                            {
+                                subir: true
+                            }
+                        );
+
+                    }
+                );
+
+            }
+
+
+            return boton;
+
+        }
+
+
+
+        /* =================================================
+           RENDER PAGINACIÓN
+        ================================================= */
+
+        function renderPaginacion(
+            paginacion
+        ) {
+
+            const {
+                pagina,
+                total,
+                totalPaginas,
+                desde,
+                hasta,
+                tieneAnterior,
+                tieneSiguiente
+            } = paginacion;
+
+
+
+            if (
+                total === 0
+            ) {
+
+                paginationZone.style.display =
+                    'none';
+
+
+                return;
+
+            }
+
+
+
+            paginationZone.style.display =
+                '';
+
+
+
+            paginationInfo.textContent =
+                `Mostrando ${desde}-${hasta} de ${total} productos`;
+
+
+
+            paginationButtons.innerHTML =
+                '';
+
+
+
+            /* ANTERIOR */
+
+            paginationButtons.appendChild(
+                crearBotonPagina({
+                    texto:
+                        '‹',
+
+                    pagina:
+                        pagina - 1,
+
+                    deshabilitado:
+                        !tieneAnterior
+                })
+            );
+
+
+
+            /*
+             * Mostramos:
+             *
+             * 1 ... anterior actual siguiente ... última
+             */
+
+            const paginas =
+                new Set([
+                    1,
+                    pagina - 1,
+                    pagina,
+                    pagina + 1,
+                    totalPaginas
+                ]);
+
+
+
+            const listaPaginas =
+                Array
+                    .from(
+                        paginas
+                    )
+                    .filter(
+                        numero =>
+                            numero >= 1 &&
+                            numero <= totalPaginas
+                    )
+                    .sort(
+                        (
+                            a,
+                            b
+                        ) =>
+                            a - b
+                    );
+
+
+
+            let anterior =
+                null;
+
+
+
+            for (
+                const numero
+                of listaPaginas
+            ) {
+
+                if (
+                    anterior !== null &&
+
+                    numero -
+                    anterior >
+                    1
+                ) {
+
+                    const separador =
+                        document.createElement(
+                            'span'
+                        );
+
+
+                    separador.textContent =
+                        '…';
+
+
+                    separador.className =
+                        'px-1 text-muted';
+
+
+                    paginationButtons
+                        .appendChild(
+                            separador
+                        );
+
+                }
+
+
+
+                paginationButtons
+                    .appendChild(
+                        crearBotonPagina({
+
+                            texto:
+                                String(
+                                    numero
+                                ),
+
+                            pagina:
+                                numero,
+
+                            activo:
+                                numero ===
+                                pagina,
+
+                            clase:
+                                'page-number'
+
+                        })
+                    );
+
+
+                anterior =
+                    numero;
+
+            }
+
+
+
+            /* SIGUIENTE */
+
+            paginationButtons.appendChild(
+                crearBotonPagina({
+
+                    texto:
+                        '›',
+
+                    pagina:
+                        pagina + 1,
+
+                    deshabilitado:
+                        !tieneSiguiente
+
+                })
+            );
+
+        }
+
+
+
+        /* =================================================
+           CARGAR INVENTARIO
+        ================================================= */
+
+        async function cargarInventario(
+
+            pagina = 1,
+
+            opciones = {}
+
+        ) {
+
+            const mantenerContenido =
+                Boolean(
+                    opciones.mantenerContenido
+                );
+
+
+            paginaActual =
+                Math.max(
+                    1,
+                    Number(
+                        pagina
+                    ) || 1
+                );
+
+
+            /*
+             * Sirve para ignorar respuestas antiguas.
+             *
+             * Ejemplo:
+             *
+             * escribes "co"
+             * inmediatamente "coca"
+             *
+             * si "co" responde después,
+             * no debe reemplazar "coca".
+             */
+
+            const peticionActual =
+                ++numeroPeticion;
+
+
+
+            clearSearchBtn.style.display =
+                terminoActual
+
+                    ?
+                    ''
+
+                    :
+                    'none';
+
+
+
+            searchStatus.textContent =
+                terminoActual
+
+                    ?
+                    `Buscando “${terminoActual}”...`
+
+                    :
+                    'Cargando inventario...';
+
+
+
+            if (
+                !mantenerContenido
+            ) {
+
+                inventoryRows.innerHTML = `
+                    <div class="inventory-loading">
+
+                        <div
+                            class="spinner-border"
+                            role="status"
+                            aria-hidden="true"
+                        ></div>
+
+                        <div>
+                            Cargando productos...
+                        </div>
+
+                    </div>
+                `;
+
+            }
+
+
+
+            try {
+
+
+                const params =
+                    new URLSearchParams({
+
+                        page:
+                            String(
+                                paginaActual
+                            )
+
+                    });
+
+
+
+                if (
+                    terminoActual
+                ) {
+
+                    params.set(
+                        'q',
+                        terminoActual
+                    );
+
+                }
+
+
+
+                const response =
+                    await fetch(
+                        `/inventario/datos?${params.toString()}`,
+                        {
+                            headers: {
+
+                                Accept:
+                                    'application/json'
+
+                            }
+                        }
+                    );
+
+
+
+                if (
+                    !response.ok
+                ) {
+
+                    throw new Error(
+                        'No se pudo cargar el inventario.'
+                    );
+
+                }
+
+
+
+                const data =
+                    await response.json();
+
+
+
+                /*
+                 * Ignorar respuestas anteriores.
+                 */
+
+                if (
+                    peticionActual !==
+                    numeroPeticion
+                ) {
+
+                    return;
+
+                }
+
+
+
+                esAdmin =
+                    Boolean(
+                        data.esAdmin
+                    );
+
+
+
+                inventoryHeader
+                    .classList
+                    .toggle(
+                        'no-purchase',
+                        !esAdmin
+                    );
+
+
+
+                purchaseHeader.style.display =
+                    esAdmin
+
+                        ?
+                        ''
+
+                        :
+                        'none';
+
+
+
+                renderProductos(
+                    data.productos
+                );
+
+
+                renderPaginacion(
+                    data.paginacion
+                );
+
+
+                paginaActual =
+                    data.paginacion.pagina;
+
+
+
+                const total =
+                    data.paginacion.total;
+
+
+
+                if (
+                    terminoActual
+                ) {
+
+                    searchStatus.textContent =
+                        `${total} resultado${
+                            total === 1
+                                ?
+                                ''
+                                :
+                                's'
+                        } para “${terminoActual}”`;
+
+                }
+
+                else {
+
+                    searchStatus.textContent =
+                        `${total} producto${
+                            total === 1
+                                ?
+                                ''
+                                :
+                                's'
+                        } registrado${
+                            total === 1
+                                ?
+                                ''
+                                :
+                                's'
+                        }`;
+
+                }
+
+
+
+                actualizarUrl();
+
+
+
+                if (
+                    opciones.subir &&
+
+                    window.innerWidth <
+                    900
+                ) {
+
+                    document
+                        .querySelector(
+                            '.inventory-search-card'
+                        )
+                        .scrollIntoView({
+
+                            behavior:
+                                'smooth',
+
+                            block:
+                                'start'
+
+                        });
+
+                }
+
+
+            } catch (error) {
+
+
+                console.error(
+                    error
+                );
+
+
+                inventoryRows.innerHTML = `
+                    <div class="inventory-error">
+
+                        <i
+                            class="
+                                fas
+                                fa-triangle-exclamation
+                                fa-2x
+                                mb-2
+                            "
+                        ></i>
+
+                        <div>
+                            ${escaparHtml(
+                                error.message
+                            )}
+                        </div>
+
+                    </div>
+                `;
+
+
+                paginationZone.style.display =
+                    'none';
+
+
+                searchStatus.textContent =
+                    'Error cargando inventario';
+
+            }
+
+        }
+
+
+
+        /* =================================================
+           BÚSQUEDA EN VIVO
+        ================================================= */
+
+        searchInput.addEventListener(
+            'input',
+            function () {
+
+
+                terminoActual =
+                    searchInput.value.trim();
+
+
+                paginaActual =
+                    1;
+
+
+                clearTimeout(
+                    timerBusqueda
+                );
+
+
+                /*
+                 * 230 ms evita disparar una
+                 * consulta por cada tecla,
+                 * pero la interfaz se siente
+                 * prácticamente instantánea.
+                 */
+
+                timerBusqueda =
+                    setTimeout(
+                        () => {
+
+                            cargarInventario(
+                                1,
+                                {
+                                    mantenerContenido:
+                                        true
+                                }
+                            );
+
+                        },
+                        230
+                    );
+
+            }
+        );
+
+
+
+        /* =================================================
+           SCANNER
+        ================================================= */
+
+        searchInput.addEventListener(
+            'keydown',
+            function (event) {
+
+
+                if (
+                    event.key !==
+                    'Enter'
+                ) {
+
+                    return;
+
+                }
+
+
+                event.preventDefault();
+
+
+                clearTimeout(
+                    timerBusqueda
+                );
+
+
+                terminoActual =
+                    searchInput.value.trim();
+
+
+                paginaActual =
+                    1;
+
+
+                /*
+                 * Los scanners suelen enviar ENTER
+                 * al terminar de leer el código.
+                 *
+                 * Por eso aquí buscamos de inmediato,
+                 * sin esperar los 230ms del buscador.
+                 */
+
+                cargarInventario(
+                    1,
+                    {
+                        mantenerContenido:
+                            true
+                    }
+                );
+
+            }
+        );
+
+
+
+        /* =================================================
+           LIMPIAR
+        ================================================= */
+
+        clearSearchBtn.addEventListener(
+            'click',
+            function () {
+
+
+                clearTimeout(
+                    timerBusqueda
+                );
+
+
+                searchInput.value =
+                    '';
+
+
+                terminoActual =
+                    '';
+
+
+                paginaActual =
+                    1;
+
+
+                cargarInventario(
+                    1
+                );
+
+
+                searchInput.focus();
+
+            }
+        );
+
+
+
+        /* =================================================
+           ESTADO INICIAL
+        ================================================= */
+
+        const paramsIniciales =
+            new URLSearchParams(
+                window.location.search
+            );
+
+
+        terminoActual =
+            String(
+                paramsIniciales.get(
+                    'q'
+                ) || ''
+            ).trim();
+
+
+        paginaActual =
+            Math.max(
+                1,
+                Number.parseInt(
+                    paramsIniciales.get(
+                        'page'
+                    ),
+                    10
+                ) || 1
+            );
+
+
+        searchInput.value =
+            terminoActual;
+
+
+
+        /*
+         * Primera carga.
+         */
+
+        cargarInventario(
+            paginaActual
+        );
+
+
+
+        /*
+         * El buscador también es el campo
+         * donde escribe el scanner.
+         */
+
+        setTimeout(
+            () =>
+                searchInput.focus(),
+            100
+        );
+
+
+    }
+);
+
 </script>

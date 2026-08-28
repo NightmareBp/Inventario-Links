@@ -1,244 +1,1556 @@
 const express = require('express');
 const router = express.Router();
+
 const pool = require('../database');
-const { isLoggedInAdmin } = require('../lib/auth');
 
-router.get('/', isLoggedInAdmin, async (req, res) => {
-    try {
-        const { q, q1 } = req.query;
-        const queryParams = [];
-        let query = 'SELECT * FROM Compras WHERE fecha_compra BETWEEN ? AND ? ORDER BY fecha_compra DESC, id_compra DESC';
-        let montototall = null;
-        if (q && q1) {
-            queryParams.push(q, q1);
-            montototal = await pool.query('SELECT SUM(monto_total) AS total_compras FROM Compras WHERE fecha_compra BETWEEN ? AND ?;', [q, q1]);
-            if (montototal[0].total_compras !== null) {
-                montototall = montototal[0].total_compras.toFixed(2);
-            } else {
-                montototall = '';
-            }
-        } else {
-            // Si no se proporcionan ambas fechas, muestra todas las compras
-            query = 'SELECT * FROM Compras ORDER BY fecha_compra DESC, id_compra DESC';
-        }
+const {
+    isLoggedInAdmin
+} = require('../lib/auth');
 
-        const compras = await pool.query(query, queryParams);
 
-        // Formatear las fechas y montos antes de renderizar la vista
-        compras.forEach((element) => {
-            const fechaCompra = new Date(element.fecha_compra);
-            element.fecha_compra = fechaCompra.toLocaleDateString('es-ES', {
-                weekday: 'long',
+/* =========================================================
+   UTILIDADES
+========================================================= */
+
+function normalizarArray(valor) {
+
+    if (Array.isArray(valor)) {
+        return valor;
+    }
+
+    if (
+        valor === undefined ||
+        valor === null
+    ) {
+        return [];
+    }
+
+    return [valor];
+}
+
+
+function fechaActualPeru() {
+
+    const partes =
+        new Intl.DateTimeFormat(
+            'en-US',
+            {
+                timeZone: 'America/Lima',
                 year: 'numeric',
-                month: 'numeric',
-                day: 'numeric'
-            });
-            element.monto_total = parseFloat(element.monto_total).toFixed(2);
-        });
+                month: '2-digit',
+                day: '2-digit'
+            }
+        ).formatToParts(new Date());
 
-        res.render('compras/listC', { compras, q, q1, montototall });
-    } catch (error) {
-        console.error('Error al obtener las compras:', error);
-        res.status(500).send('Error interno del servidor');
-    }
-});
 
-router.get('/add', isLoggedInAdmin, async (req, res) => {
-    try {
-        // Consulta para obtener todos los productos y su inventario
-        const productos = await pool.query(`SELECT p.*, IFNULL(inventario_total, 0) AS inventario_total
-        FROM Productos p
-        LEFT JOIN (
-            SELECT id_producto, SUM(inventario) AS inventario_total
-            FROM Fechas_vencimiento
-            GROUP BY id_producto
-        ) fv ON p.id_producto = fv.id_producto
-        ORDER BY p.nombre_producto ASC;`);
+    const valores = {};
 
-        // Renderizar la vista de agregar compra, pasando los productos
-        res.render('compras/addCompra', { productos });
-    } catch (error) {
-        console.error('Error al obtener los productos para la compra:', error);
-        res.status(500).send('Error interno del servidor');
-    }
-});
+    partes.forEach(parte => {
+        valores[parte.type] = parte.value;
+    });
 
-router.get('/productos/:idProducto/preciosCompra', isLoggedInAdmin, async (req, res) => {
-    try {
-        const { idProducto } = req.params;
 
-        // Consulta para obtener los precios de compra del producto seleccionado con los nombres de las unidades
-        const preciosCompra = await pool.query(`
-            SELECT pp.*, u.nombre AS nombre_unidad 
-            FROM Precios_productos pp 
-            INNER JOIN Unidades u ON pp.id_unidad = u.id_unidad 
-            WHERE pp.id_producto = ? AND pp.precio_compra != 0`, [idProducto]);
+    return (
+        `${valores.year}-` +
+        `${valores.month}-` +
+        `${valores.day}`
+    );
+}
 
-        res.json(preciosCompra); // Devolver los precios de compra como respuesta en formato JSON
-    } catch (error) {
-        console.error('Error al obtener los precios de compra del producto:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
-    }
-});
 
-router.post('/add', isLoggedInAdmin, async (req, res) => {
-    try {
-        const productos = Array.isArray(req.body.producto) ? req.body.producto : [req.body.producto];
-        const precioscompra = Array.isArray(req.body.preciocompra) ? req.body.preciocompra : [req.body.preciocompra];
-        const cantidades = Array.isArray(req.body.cantidad) ? req.body.cantidad : [req.body.cantidad];
-        const fechasVencimiento = Array.isArray(req.body.fecha_vencimiento) ? req.body.fecha_vencimiento : [req.body.fecha_vencimiento];
+/* =========================================================
+   TRANSACCIONES
+========================================================= */
 
-        console.log(productos, cantidades, precioscompra, fechasVencimiento);
+function obtenerConexion() {
 
-        // Validar entradas duplicadas
-        for (let i = 0; i < cantidades.length; i++) {
-            const producto = productos[i];
-            const preciocompra = precioscompra[i];
-            for (let j = i + 1; j < cantidades.length; j++) {
-                if (producto === productos[j] && preciocompra === precioscompra[j] && fechasVencimiento[i] === fechasVencimiento[j]) {
-                    req.flash('message', 'Existen Entradas Duplicadas');
-                    return res.redirect('/compras/add');
+    return new Promise(
+        (resolve, reject) => {
+
+            pool.getConnection(
+                (error, connection) => {
+
+                    if (error) {
+                        return reject(error);
+                    }
+
+                    resolve(connection);
                 }
-            }
+            );
+
         }
+    );
+}
 
-        // Validar cantidades
-        for (let i = 0; i < cantidades.length; i++) {
-            const cantidad = parseFloat(cantidades[i]); // Convertir el valor de cantidad a decimal
-            if (isNaN(cantidad) || cantidad <= 0) { // Verificar si el valor no es un número o es menor o igual a cero
-                req.flash('message', 'Por favor, ingrese cantidades válidas como números decimales.');
-                return res.redirect('/compras/add');
-            }
-        }
 
-        // Validar que la fecha de vencimiento sea mayor a la fecha actual
-        const fechaActual = new Date();
-        for (let i = 0; i < fechasVencimiento.length; i++) {
-            const fechaVenc = new Date(fechasVencimiento[i]);
-            if (fechaVenc && fechaVenc < fechaActual) {
-                req.flash('message', 'La fecha de vencimiento debe ser mayor a la fecha actual.');
-                return res.redirect('/compras/add');
-            }
-        }
+function consultar(
+    connection,
+    sql,
+    params = []
+) {
 
-        // Calcular el monto total de la compra
-        let montototal = 0;
-        for (let i = 0; i < cantidades.length; i++) {
-            const cantidad = cantidades[i];
-            const datospreciocompra = await pool.query('SELECT * FROM Precios_productos WHERE id_precio = ?', [precioscompra[i]]);
-            const preciocompra = datospreciocompra[0].precio_compra;
-            montototal += parseFloat(cantidad) * parseFloat(preciocompra);
-        }
-
-        // Registrar la compra en la tabla de Compras
-        const result = await pool.query('INSERT INTO Compras SET ?', {
-            fecha_compra: fechaActual,
-            monto_total: montototal,
-        });
-        const compraid = result.insertId;
-
-        // Registrar el detalle de la compra y actualizar inventarios
-        for (let i = 0; i < cantidades.length; i++) {
-            const datospreciocompra = await pool.query('SELECT * FROM Precios_productos WHERE id_precio = ?', [precioscompra[i]]);
-            const cantidad = cantidades[i];
-            const preciocompra = datospreciocompra[0].precio_compra;
-            const precioparcial = parseFloat(preciocompra) * parseFloat(cantidad);
-            const idunidad = datospreciocompra[0].id_unidad;
-
-            const nuevodetalle = {
-                id_producto: productos[i],
-                cantidad_producto: cantidad,
-                precio_parcial: precioparcial,
-                id_compra: compraid,
-                id_unidad: idunidad,
-            };
-            await pool.query('INSERT INTO Detalle_compra SET ?', nuevodetalle);
-
-            const datosunidad = await pool.query('SELECT * FROM Unidades WHERE id_unidad = ?', [idunidad]);
-            const cantidadreferencia = datosunidad[0].cantidad;
-            let inventarionuevo = parseFloat(cantidadreferencia) * parseFloat(cantidad);
-
-            const fechaVencimiento = fechasVencimiento[i] || null;
-
-            // Verificar si existe un inventario con la misma fecha de vencimiento (incluyendo null)
-            const inventarioExistente = await pool.query('SELECT * FROM Fechas_vencimiento WHERE id_producto = ? AND (fecha_vencimiento = ? OR (fecha_vencimiento IS NULL AND ? IS NULL))', [productos[i], fechaVencimiento, fechaVencimiento]);
-
-            if (inventarioExistente.length > 0) {
-                // Si existe, sumar la cantidad al inventario existente
-                const inventarioActual = inventarioExistente[0].inventario;
-                const nuevoInventario = parseFloat(inventarioActual) + parseFloat(inventarionuevo);
-                await pool.query('UPDATE Fechas_vencimiento SET inventario = ? WHERE id_fechavencimiento = ?', [nuevoInventario, inventarioExistente[0].id_fechavencimiento]);
-            } else {
-                // Si no existe, crear un nuevo registro en Fechas_vencimiento
-                const nuevoInventario = {
-                    inventario: inventarionuevo,
-                    fecha_vencimiento: fechaVencimiento,
-                    id_producto: productos[i],
-                };
-                await pool.query('INSERT INTO Fechas_vencimiento SET ?', nuevoInventario);
-            }
-        }
-
-        req.flash('success', 'Compra Registrada Correctamente');
-        res.redirect('/compras');
-    } catch (error) {
-        console.error('Error al procesar el formulario:', error);
-        req.flash('message', 'Error interno del servidor.');
-        res.redirect('/compras/add');
+    if (!connection) {
+        return pool.query(sql, params);
     }
-});
 
-router.get('/productos/barcode/:barcode', isLoggedInAdmin, async (req, res) => {
-    try {
-        const { barcode } = req.params;
 
-        // Consulta para obtener el producto y su unidad por código de barras
-        const producto = await pool.query(`
-            SELECT pp.id_precio, pp.precio_venta, pp.precio_compra, u.nombre AS nombre_unidad, p.id_producto, p.nombre_producto, fv.inventario_total
-            FROM Precios_productos pp
-            INNER JOIN Unidades u ON pp.id_unidad = u.id_unidad
-            INNER JOIN Productos p ON pp.id_producto = p.id_producto
-            LEFT JOIN (
-                SELECT id_producto, SUM(inventario) AS inventario_total
-                FROM Fechas_vencimiento
-                GROUP BY id_producto
-            ) fv ON p.id_producto = fv.id_producto
-            WHERE pp.codigo_barras = ? LIMIT 1`, [barcode]);
+    return new Promise(
+        (resolve, reject) => {
 
-        if (producto.length === 0) {
-            return res.status(404).json({ error: 'Producto no encontrado' });
+            connection.query(
+                sql,
+                params,
+                (error, resultado) => {
+
+                    if (error) {
+                        return reject(error);
+                    }
+
+                    resolve(resultado);
+                }
+            );
+
         }
+    );
+}
 
-        // Verificar si el producto tiene un precio de compra registrado
-        if (!producto[0].precio_compra) {
-            return res.status(400).json({ error: 'El producto no tiene un precio de compra registrado' });
+
+function iniciarTransaccion(connection) {
+
+    return new Promise(
+        (resolve, reject) => {
+
+            connection.beginTransaction(
+                error => {
+
+                    if (error) {
+                        return reject(error);
+                    }
+
+                    resolve();
+                }
+            );
+
         }
+    );
+}
 
-        res.json(producto[0]); // Devolver el producto encontrado
-    } catch (error) {
-        console.error('Error al obtener el producto por código de barras:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
+
+function confirmarTransaccion(connection) {
+
+    return new Promise(
+        (resolve, reject) => {
+
+            connection.commit(
+                error => {
+
+                    if (error) {
+                        return reject(error);
+                    }
+
+                    resolve();
+                }
+            );
+
+        }
+    );
+}
+
+
+function cancelarTransaccion(connection) {
+
+    return new Promise(
+        resolve => {
+
+            connection.rollback(
+                () => resolve()
+            );
+
+        }
+    );
+}
+
+
+/* =========================================================
+   ACTUALIZAR ESTADO DE PRODUCTO
+========================================================= */
+
+async function actualizarEstadoProducto(
+    idProducto,
+    connection = null
+) {
+
+    const resultado =
+        await consultar(
+            connection,
+            `
+                SELECT
+                    p.id_producto,
+                    p.cantidad_limite,
+
+                    COALESCE(
+                        SUM(fv.inventario),
+                        0
+                    ) AS inventario_total
+
+                FROM Productos p
+
+                LEFT JOIN Fechas_vencimiento fv
+                    ON fv.id_producto =
+                       p.id_producto
+
+                WHERE
+                    p.id_producto = ?
+
+                GROUP BY
+                    p.id_producto,
+                    p.cantidad_limite
+            `,
+            [idProducto]
+        );
+
+
+    if (resultado.length === 0) {
+        return;
     }
-});
 
-router.get('/detalle/:id', isLoggedInAdmin, async (req, res) => {
-    const { id } = req.params;
-    const detalles = await pool.query(`SELECT Detalle_compra.*, Productos.nombre_producto, Unidades.nombre, Unidades.cantidad FROM Detalle_compra 
-                                       INNER JOIN Productos ON Detalle_compra.id_producto = Productos.id_producto 
-                                       INNER JOIN Unidades ON Detalle_compra.id_unidad = Unidades.id_unidad 
-                                       WHERE Detalle_compra.id_compra = ?`, [id]);
-    const compras = await pool.query('SELECT * FROM Compras WHERE id_compra = ?', [id]);
-    var fechaBaseDatos = new Date();
-    const opcionesFormato = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    compras.forEach((element) => {
-        fechaBaseDatos = element.fecha_compra
-        element.fecha_compra = fechaBaseDatos.toLocaleDateString('es-ES', opcionesFormato);
-        element.monto_total = parseFloat(element.monto_total).toFixed(2);
-    })
-    detalles.forEach((element) => {
-        element.precio_parcial = parseFloat(element.precio_parcial).toFixed(2);
-    })
-    res.render('compras/VerDetalleCompra', { detalles, compra: compras[0] });
-});
+
+    const stock =
+        Number(
+            resultado[0].inventario_total
+        ) || 0;
+
+
+    const limite =
+        Number(
+            resultado[0].cantidad_limite
+        ) || 0;
+
+
+    let estado = 1;
+
+
+    if (stock <= 0) {
+
+        estado = 3;
+
+    } else if (stock <= limite) {
+
+        estado = 2;
+
+    }
+
+
+    await consultar(
+        connection,
+        `
+            UPDATE Productos
+            SET estado_producto = ?
+            WHERE id_producto = ?
+        `,
+        [
+            estado,
+            idProducto
+        ]
+    );
+
+
+    /*
+     * Eliminar notificaciones que
+     * dejaron de ser válidas.
+     */
+    if (estado === 1) {
+
+        await consultar(
+            connection,
+            `
+                DELETE FROM Notificaciones
+                WHERE
+                    id_producto = ?
+                    AND existencias IN (2, 3)
+            `,
+            [idProducto]
+        );
+
+    } else if (estado === 2) {
+
+        await consultar(
+            connection,
+            `
+                DELETE FROM Notificaciones
+                WHERE
+                    id_producto = ?
+                    AND existencias = 3
+            `,
+            [idProducto]
+        );
+
+    } else {
+
+        await consultar(
+            connection,
+            `
+                DELETE FROM Notificaciones
+                WHERE
+                    id_producto = ?
+                    AND existencias = 2
+            `,
+            [idProducto]
+        );
+
+    }
+
+}
+
+
+/* =========================================================
+   LISTADO
+========================================================= */
+
+router.get(
+    '/',
+    isLoggedInAdmin,
+    async (req, res) => {
+
+        try {
+
+            const {
+                q,
+                q1
+            } = req.query;
+
+
+            const orden =
+                req.query.orden === 'asc'
+                    ? 'asc'
+                    : 'desc';
+
+
+            const ordenSQL =
+                orden === 'asc'
+                    ? 'ASC'
+                    : 'DESC';
+
+
+            const params = [];
+
+            let where = '';
+
+
+            if (q && q1) {
+
+                where = `
+                    WHERE
+                        fecha_compra >=
+                            CONCAT(?, ' 00:00:00')
+
+                        AND
+
+                        fecha_compra <
+                            DATE_ADD(
+                                CONCAT(?, ' 00:00:00'),
+                                INTERVAL 1 DAY
+                            )
+                `;
+
+
+                params.push(
+                    q,
+                    q1
+                );
+
+            }
+
+
+            const compras =
+                await pool.query(
+                    `
+                        SELECT
+                            c.*,
+
+                            DATE_FORMAT(
+                                c.fecha_compra,
+                                '%d/%m/%Y'
+                            ) AS fecha_mostrar,
+
+                            DATE_FORMAT(
+                                c.fecha_compra,
+                                '%H:%i:%s'
+                            ) AS hora_mostrar
+
+                        FROM Compras c
+
+                        ${where}
+
+                        ORDER BY
+                            c.fecha_compra ${ordenSQL},
+                            c.id_compra ${ordenSQL}
+                    `,
+                    params
+                );
+
+
+            compras.forEach(
+                compra => {
+
+                    compra.monto_total =
+                        Number(
+                            compra.monto_total
+                        ).toFixed(2);
+
+                }
+            );
+
+
+            let montototall = null;
+
+
+            if (q && q1) {
+
+                const total =
+                    await pool.query(
+                        `
+                            SELECT
+                                COALESCE(
+                                    SUM(monto_total),
+                                    0
+                                ) AS total_compras
+
+                            FROM Compras
+
+                            ${where}
+                        `,
+                        params
+                    );
+
+
+                montototall =
+                    Number(
+                        total[0].total_compras
+                    ).toFixed(2);
+
+            }
+
+
+            return res.render(
+                'compras/listC',
+                {
+                    compras,
+                    q,
+                    q1,
+                    orden,
+                    montototall
+                }
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                'Error al obtener compras:',
+                error
+            );
+
+
+            return res
+                .status(500)
+                .send(
+                    'Error interno del servidor'
+                );
+
+        }
+
+    }
+);
+
+
+/* =========================================================
+   FORMULARIO
+========================================================= */
+
+router.get(
+    '/add',
+    isLoggedInAdmin,
+    async (req, res) => {
+
+        return res.render(
+            'compras/addCompra'
+        );
+
+    }
+);
+
+
+/* =========================================================
+   AUTOCOMPLETADO
+========================================================= */
+
+router.get(
+    '/productos/buscar',
+    isLoggedInAdmin,
+    async (req, res) => {
+
+        try {
+
+            const termino =
+                String(
+                    req.query.q || ''
+                ).trim();
+
+
+            /*
+             * No buscamos hasta que el usuario
+             * escriba al menos dos caracteres.
+             */
+            if (termino.length < 2) {
+
+                return res.json([]);
+
+            }
+
+
+            const contiene =
+                `%${termino}%`;
+
+
+            const comienza =
+                `${termino}%`;
+
+
+            const productos =
+                await pool.query(
+                    `
+                        SELECT
+                            p.id_producto,
+                            p.nombre_producto,
+
+                            COALESCE(
+                                fv.inventario_total,
+                                0
+                            ) AS inventario_total
+
+                        FROM Productos p
+
+                        LEFT JOIN (
+
+                            SELECT
+                                id_producto,
+                                SUM(inventario)
+                                    AS inventario_total
+
+                            FROM Fechas_vencimiento
+
+                            GROUP BY id_producto
+
+                        ) fv
+                            ON fv.id_producto =
+                               p.id_producto
+
+
+                        WHERE
+
+                            (
+                                p.nombre_producto
+                                    LIKE ?
+
+                                OR EXISTS (
+
+                                    SELECT 1
+
+                                    FROM Precios_productos pb
+
+                                    WHERE
+                                        pb.id_producto =
+                                            p.id_producto
+
+                                        AND
+                                        pb.codigo_barras
+                                            LIKE ?
+                                )
+                            )
+
+
+                            AND EXISTS (
+
+                                SELECT 1
+
+                                FROM Precios_productos pc
+
+                                WHERE
+                                    pc.id_producto =
+                                        p.id_producto
+
+                                    AND
+                                    pc.precio_compra > 0
+                            )
+
+
+                        ORDER BY
+
+                            CASE
+                                WHEN
+                                    p.nombre_producto
+                                        LIKE ?
+                                THEN 0
+                                ELSE 1
+                            END,
+
+                            p.nombre_producto ASC
+
+
+                        LIMIT 10
+                    `,
+                    [
+                        contiene,
+                        contiene,
+                        comienza
+                    ]
+                );
+
+
+            return res.json(
+                productos
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                'Error buscando productos:',
+                error
+            );
+
+
+            return res
+                .status(500)
+                .json({
+                    error:
+                        'Error al buscar productos'
+                });
+
+        }
+
+    }
+);
+
+
+/* =========================================================
+   PRECIOS DE COMPRA
+========================================================= */
+
+router.get(
+    '/productos/:idProducto/preciosCompra',
+    isLoggedInAdmin,
+    async (req, res) => {
+
+        try {
+
+            const {
+                idProducto
+            } = req.params;
+
+
+            const precios =
+                await pool.query(
+                    `
+                        SELECT
+                            pp.id_precio,
+                            pp.id_unidad,
+                            pp.precio_compra,
+
+                            u.nombre
+                                AS nombre_unidad,
+
+                            u.cantidad
+                                AS cantidad_referencial
+
+                        FROM Precios_productos pp
+
+                        INNER JOIN Unidades u
+                            ON u.id_unidad =
+                               pp.id_unidad
+
+                        WHERE
+                            pp.id_producto = ?
+
+                            AND
+                            pp.precio_compra > 0
+
+                        ORDER BY
+                            u.nombre ASC
+                    `,
+                    [idProducto]
+                );
+
+
+            return res.json(
+                precios
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                'Error obteniendo precios:',
+                error
+            );
+
+
+            return res
+                .status(500)
+                .json({
+                    error:
+                        'Error obteniendo precios'
+                });
+
+        }
+
+    }
+);
+
+
+/* =========================================================
+   CÓDIGO DE BARRAS
+========================================================= */
+
+router.get(
+    '/productos/barcode/:barcode',
+    isLoggedInAdmin,
+    async (req, res) => {
+
+        try {
+
+            const barcode =
+                String(
+                    req.params.barcode
+                ).trim();
+
+
+            const resultado =
+                await pool.query(
+                    `
+                        SELECT
+                            pp.id_precio,
+                            pp.id_producto,
+                            pp.id_unidad,
+                            pp.precio_compra,
+
+                            u.nombre
+                                AS nombre_unidad,
+
+                            u.cantidad
+                                AS cantidad_referencial,
+
+                            p.nombre_producto,
+
+                            COALESCE(
+                                fv.inventario_total,
+                                0
+                            ) AS inventario_total
+
+                        FROM Precios_productos pp
+
+                        INNER JOIN Productos p
+                            ON p.id_producto =
+                               pp.id_producto
+
+                        INNER JOIN Unidades u
+                            ON u.id_unidad =
+                               pp.id_unidad
+
+                        LEFT JOIN (
+
+                            SELECT
+                                id_producto,
+                                SUM(inventario)
+                                    AS inventario_total
+
+                            FROM Fechas_vencimiento
+
+                            GROUP BY id_producto
+
+                        ) fv
+                            ON fv.id_producto =
+                               p.id_producto
+
+                        WHERE
+                            pp.codigo_barras = ?
+
+                        LIMIT 1
+                    `,
+                    [barcode]
+                );
+
+
+            if (
+                resultado.length === 0
+            ) {
+
+                return res
+                    .status(404)
+                    .json({
+                        error:
+                            'Código de barras no registrado'
+                    });
+
+            }
+
+
+            const producto =
+                resultado[0];
+
+
+            if (
+                Number(
+                    producto.precio_compra
+                ) <= 0
+            ) {
+
+                return res
+                    .status(400)
+                    .json({
+                        error:
+                            'Este producto no tiene precio de compra'
+                    });
+
+            }
+
+
+            return res.json(
+                producto
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                'Error leyendo código:',
+                error
+            );
+
+
+            return res
+                .status(500)
+                .json({
+                    error:
+                        'Error interno del servidor'
+                });
+
+        }
+
+    }
+);
+
+
+/* =========================================================
+   REGISTRAR COMPRA
+========================================================= */
+
+router.post(
+    '/add',
+    isLoggedInAdmin,
+    async (req, res) => {
+
+        let connection = null;
+
+
+        try {
+
+            const productos =
+                normalizarArray(
+                    req.body.producto
+                );
+
+
+            const precios =
+                normalizarArray(
+                    req.body.preciocompra
+                );
+
+
+            const cantidades =
+                normalizarArray(
+                    req.body.cantidad
+                );
+
+
+            const fechas =
+                normalizarArray(
+                    req.body.fecha_vencimiento
+                );
+
+
+            if (
+                productos.length === 0
+            ) {
+
+                req.flash(
+                    'message',
+                    'Debe agregar al menos un producto.'
+                );
+
+
+                return res.redirect(
+                    '/compras/add'
+                );
+
+            }
+
+
+            if (
+                productos.length !==
+                    precios.length ||
+
+                productos.length !==
+                    cantidades.length
+            ) {
+
+                req.flash(
+                    'message',
+                    'Los datos de la compra están incompletos.'
+                );
+
+
+                return res.redirect(
+                    '/compras/add'
+                );
+
+            }
+
+
+            const hoy =
+                fechaActualPeru();
+
+
+            /*
+             * Validaciones básicas.
+             */
+            for (
+                let i = 0;
+                i < productos.length;
+                i++
+            ) {
+
+                const cantidad =
+                    Number(
+                        cantidades[i]
+                    );
+
+
+                if (
+                    !Number.isInteger(cantidad) ||
+                    cantidad <= 0
+                ) {
+
+                    req.flash(
+                        'message',
+                        'Las cantidades deben ser números enteros mayores que cero.'
+                    );
+
+
+                    return res.redirect(
+                        '/compras/add'
+                    );
+
+                }
+
+
+                const fecha =
+                    fechas[i] || null;
+
+
+                if (fecha) {
+
+                    if (
+                        !/^\d{4}-\d{2}-\d{2}$/
+                            .test(fecha)
+                    ) {
+
+                        req.flash(
+                            'message',
+                            'Existe una fecha de vencimiento inválida.'
+                        );
+
+
+                        return res.redirect(
+                            '/compras/add'
+                        );
+
+                    }
+
+
+                    if (fecha < hoy) {
+
+                        req.flash(
+                            'message',
+                            'La fecha de vencimiento no puede ser anterior a hoy.'
+                        );
+
+
+                        return res.redirect(
+                            '/compras/add'
+                        );
+
+                    }
+
+                }
+
+
+                /*
+                 * Debido a la PK actual de Detalle_compra,
+                 * no puede repetirse el mismo
+                 * producto + unidad dentro de una compra.
+                 */
+                for (
+                    let j = i + 1;
+                    j < productos.length;
+                    j++
+                ) {
+
+                    if (
+                        String(productos[i]) ===
+                            String(productos[j])
+
+                        &&
+
+                        String(precios[i]) ===
+                            String(precios[j])
+                    ) {
+
+                        req.flash(
+                            'message',
+                            'El mismo producto y presentación está repetido. Ajuste la cantidad en una sola fila.'
+                        );
+
+
+                        return res.redirect(
+                            '/compras/add'
+                        );
+
+                    }
+
+                }
+
+            }
+
+
+            /*
+             * Validar precios directamente
+             * contra la BD.
+             */
+            const lineas = [];
+
+            let montoTotal = 0;
+
+
+            for (
+                let i = 0;
+                i < productos.length;
+                i++
+            ) {
+
+                const resultadoPrecio =
+                    await pool.query(
+                        `
+                            SELECT
+                                pp.id_precio,
+                                pp.id_producto,
+                                pp.id_unidad,
+                                pp.precio_compra,
+
+                                u.cantidad
+                                    AS cantidad_referencial
+
+                            FROM Precios_productos pp
+
+                            INNER JOIN Unidades u
+                                ON u.id_unidad =
+                                   pp.id_unidad
+
+                            WHERE
+                                pp.id_precio = ?
+
+                                AND
+                                pp.id_producto = ?
+
+                                AND
+                                pp.precio_compra > 0
+
+                            LIMIT 1
+                        `,
+                        [
+                            precios[i],
+                            productos[i]
+                        ]
+                    );
+
+
+                if (
+                    resultadoPrecio.length === 0
+                ) {
+
+                    req.flash(
+                        'message',
+                        'Uno de los precios seleccionados ya no es válido.'
+                    );
+
+
+                    return res.redirect(
+                        '/compras/add'
+                    );
+
+                }
+
+
+                const datos =
+                    resultadoPrecio[0];
+
+
+                const cantidad =
+                    Number(
+                        cantidades[i]
+                    );
+
+
+                const precio =
+                    Number(
+                        datos.precio_compra
+                    );
+
+
+                const subtotal =
+                    precio *
+                    cantidad;
+
+
+                montoTotal +=
+                    subtotal;
+
+
+                lineas.push({
+
+                    idProducto:
+                        Number(
+                            productos[i]
+                        ),
+
+                    idUnidad:
+                        Number(
+                            datos.id_unidad
+                        ),
+
+                    cantidad,
+
+                    precio,
+
+                    subtotal,
+
+                    cantidadReferencial:
+                        Number(
+                            datos.cantidad_referencial
+                        ),
+
+                    fechaVencimiento:
+                        fechas[i] || null
+
+                });
+
+            }
+
+
+            /* =========================================
+               TRANSACCIÓN
+            ========================================= */
+
+            connection =
+                await obtenerConexion();
+
+
+            await iniciarTransaccion(
+                connection
+            );
+
+
+            const resultadoCompra =
+                await consultar(
+                    connection,
+                    `
+                        INSERT INTO Compras
+                        (
+                            fecha_compra,
+                            monto_total
+                        )
+
+                        VALUES
+                        (
+                            CONVERT_TZ(
+                                UTC_TIMESTAMP(),
+                                '+00:00',
+                                '-05:00'
+                            ),
+                            ?
+                        )
+                    `,
+                    [montoTotal]
+                );
+
+
+            const idCompra =
+                resultadoCompra.insertId;
+
+
+            for (
+                const linea
+                of lineas
+            ) {
+
+                await consultar(
+                    connection,
+                    `
+                        INSERT INTO Detalle_compra
+                        (
+                            id_producto,
+                            id_unidad,
+                            id_compra,
+                            cantidad_producto,
+                            precio_parcial
+                        )
+
+                        VALUES (?, ?, ?, ?, ?)
+                    `,
+                    [
+                        linea.idProducto,
+                        linea.idUnidad,
+                        idCompra,
+                        linea.cantidad,
+                        linea.subtotal
+                    ]
+                );
+
+
+                const cantidadInventario =
+                    linea.cantidad *
+                    linea.cantidadReferencial;
+
+
+                /*
+                 * <=> es igualdad segura con NULL.
+                 */
+                const lote =
+                    await consultar(
+                        connection,
+                        `
+                            SELECT
+                                id_fechavencimiento,
+                                inventario
+
+                            FROM Fechas_vencimiento
+
+                            WHERE
+                                id_producto = ?
+
+                                AND
+                                fecha_vencimiento <=> ?
+
+                            LIMIT 1
+
+                            FOR UPDATE
+                        `,
+                        [
+                            linea.idProducto,
+                            linea.fechaVencimiento
+                        ]
+                    );
+
+
+                if (lote.length > 0) {
+
+                    await consultar(
+                        connection,
+                        `
+                            UPDATE Fechas_vencimiento
+
+                            SET
+                                inventario =
+                                    inventario + ?
+
+                            WHERE
+                                id_fechavencimiento = ?
+                        `,
+                        [
+                            cantidadInventario,
+
+                            lote[0]
+                                .id_fechavencimiento
+                        ]
+                    );
+
+                } else {
+
+                    await consultar(
+                        connection,
+                        `
+                            INSERT INTO Fechas_vencimiento
+                            (
+                                fecha_vencimiento,
+                                inventario,
+                                id_producto
+                            )
+
+                            VALUES (?, ?, ?)
+                        `,
+                        [
+                            linea.fechaVencimiento,
+                            cantidadInventario,
+                            linea.idProducto
+                        ]
+                    );
+
+                }
+
+            }
+
+
+            const productosActualizados =
+                [
+                    ...new Set(
+                        lineas.map(
+                            linea =>
+                                linea.idProducto
+                        )
+                    )
+                ];
+
+
+            for (
+                const idProducto
+                of productosActualizados
+            ) {
+
+                await actualizarEstadoProducto(
+                    idProducto,
+                    connection
+                );
+
+            }
+
+
+            await confirmarTransaccion(
+                connection
+            );
+
+
+            req.flash(
+                'success',
+                'Compra registrada correctamente.'
+            );
+
+
+            return res.redirect(
+                '/compras'
+            );
+
+
+        } catch (error) {
+
+            if (connection) {
+
+                await cancelarTransaccion(
+                    connection
+                );
+
+            }
+
+
+            console.error(
+                'Error registrando compra:',
+                error
+            );
+
+
+            req.flash(
+                'message',
+                'No se pudo registrar la compra.'
+            );
+
+
+            return res.redirect(
+                '/compras/add'
+            );
+
+
+        } finally {
+
+            if (connection) {
+
+                connection.release();
+
+            }
+
+        }
+
+    }
+);
+
+
+/* =========================================================
+   DETALLE
+========================================================= */
+
+router.get(
+    '/detalle/:id',
+    isLoggedInAdmin,
+    async (req, res) => {
+
+        try {
+
+            const {
+                id
+            } = req.params;
+
+
+            const compras =
+                await pool.query(
+                    `
+                        SELECT
+                            c.*,
+
+                            DATE_FORMAT(
+                                c.fecha_compra,
+                                '%d/%m/%Y'
+                            ) AS fecha_mostrar,
+
+                            DATE_FORMAT(
+                                c.fecha_compra,
+                                '%H:%i:%s'
+                            ) AS hora_mostrar
+
+                        FROM Compras c
+
+                        WHERE
+                            c.id_compra = ?
+
+                        LIMIT 1
+                    `,
+                    [id]
+                );
+
+
+            if (
+                compras.length === 0
+            ) {
+
+                req.flash(
+                    'message',
+                    'La compra no existe.'
+                );
+
+
+                return res.redirect(
+                    '/compras'
+                );
+
+            }
+
+
+            const detalles =
+                await pool.query(
+                    `
+                        SELECT
+                            dc.*,
+
+                            p.nombre_producto,
+
+                            u.nombre
+                                AS nombre_unidad,
+
+                            u.cantidad
+                                AS cantidad_unidad
+
+                        FROM Detalle_compra dc
+
+                        INNER JOIN Productos p
+                            ON p.id_producto =
+                               dc.id_producto
+
+                        INNER JOIN Unidades u
+                            ON u.id_unidad =
+                               dc.id_unidad
+
+                        WHERE
+                            dc.id_compra = ?
+
+                        ORDER BY
+                            p.nombre_producto ASC
+                    `,
+                    [id]
+                );
+
+
+            detalles.forEach(
+                detalle => {
+
+                    detalle.precio_parcial =
+                        Number(
+                            detalle.precio_parcial
+                        ).toFixed(2);
+
+
+                    detalle.precio_unitario =
+                        (
+                            Number(
+                                detalle.precio_parcial
+                            ) /
+                            Number(
+                                detalle.cantidad_producto
+                            )
+                        ).toFixed(2);
+
+                }
+            );
+
+
+            const compra =
+                compras[0];
+
+
+            compra.monto_total =
+                Number(
+                    compra.monto_total
+                ).toFixed(2);
+
+
+            return res.render(
+                'compras/VerDetalleCompra',
+                {
+                    compra,
+                    detalles
+                }
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                'Error viendo compra:',
+                error
+            );
+
+
+            req.flash(
+                'message',
+                'No se pudo cargar la compra.'
+            );
+
+
+            return res.redirect(
+                '/compras'
+            );
+
+        }
+
+    }
+);
+
 
 module.exports = router;
