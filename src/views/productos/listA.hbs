@@ -1651,7 +1651,7 @@ document.addEventListener(
                                             Solo lectura
                                         </span>
                                     `;
- const accion = `<div class="d-grid gap-1">${accionEdicion}<a class="btn btn-sm btn-outline-secondary" href="/inventario/kardex/${Number(producto.id_producto)}">Kardex</a></div>`;
+ const accion = `<div class="d-grid gap-1">${accionEdicion}${esAdmin ? `<a class="btn btn-sm btn-outline-warning" href="/inventario/lotes/${Number(producto.id_producto)}">Lotes / vencimiento</a>` : ''}<a class="btn btn-sm btn-outline-secondary" href="/inventario/kardex/${Number(producto.id_producto)}">Kardex</a></div>`;
 
 
 

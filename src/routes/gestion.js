@@ -85,6 +85,53 @@ for(const config of [{path:'clientes',table:'Clientes',id:'id_cliente',kind:'ven
         res.json({rows,...total,...fechas,page,base:kind==='compra'?'/compras':'/ventas'});
     }));
 }
+router.get('/inventario/lotes/:id',isLoggedInAdmin,safe(async(req,res)=>{
+    const [product]=await q('SELECT id_producto,nombre_producto FROM Productos WHERE id_producto=?',[req.params.id]);
+    if(!product) return res.status(404).send('Producto no encontrado.');
+    res.render('gestion/lotes',{product});
+}));
+router.get('/inventario/lotes/:id/datos',isLoggedIn,admin,safe(async(req,res)=>{
+    const rows=await q(`SELECT id_fechavencimiento id,inventario,DATE_FORMAT(fecha_vencimiento,'%Y-%m-%d') fecha
+        FROM Fechas_vencimiento WHERE id_producto=? ORDER BY inventario>0 DESC,fecha_vencimiento IS NULL,fecha_vencimiento,id_fechavencimiento`,[req.params.id]);
+    const history=await q(`SELECT id_fechavencimiento lote,DATE_FORMAT(fecha,'%d/%m/%Y %H:%i:%s') fecha,
+        usuario_nombre,observacion FROM Movimientos_inventario WHERE id_producto=? AND tipo='CORRECCION_VENCIMIENTO'
+        ORDER BY fecha DESC,id_movimiento DESC LIMIT 100`,[req.params.id]);
+    res.json({rows,history});
+}));
+router.post('/inventario/lotes/:id/vencimiento',isLoggedIn,admin,safe(async(req,res)=>{
+    const productId=Number(req.params.id),lotId=Number(req.body.id_lote);
+    if(!Number.isSafeInteger(lotId)||lotId<=0) throw new Error('Lote inválido.');
+    if(typeof req.body.fecha!=='string'||typeof req.body.fecha_anterior!=='string') throw new Error('Indique la fecha del lote.');
+    const date=S.validDate(req.body.fecha),previous=S.validDate(req.body.fecha_anterior);
+    const reason=String(req.body.motivo||'').trim();
+    if(!reason||reason.length>350) throw new Error('Indique el motivo de la corrección (máximo 350 caracteres).');
+    await S.transaction(async c=>{
+        // Mismo orden de bloqueos que compras/ventas: producto antes que lote.
+        const p=(await S.lockProducts(c,[productId])).get(productId);
+        const [lot]=await S.query(c,`SELECT id_fechavencimiento,inventario,DATE_FORMAT(fecha_vencimiento,'%Y-%m-%d') fecha
+            FROM Fechas_vencimiento WHERE id_fechavencimiento=? AND id_producto=? FOR UPDATE`,[lotId,productId]);
+        if(!lot) throw new Error('El lote no pertenece a este producto.');
+        if(lot.fecha!==previous) throw new Error('La fecha del lote cambió desde que abrió la página. Recargue antes de corregirla.');
+        if(lot.fecha===date) throw new Error('La fecha nueva es igual a la actual.');
+        await S.query(c,'UPDATE Fechas_vencimiento SET fecha_vencimiento=? WHERE id_fechavencimiento=?',[date,lotId]);
+        await S.movement(c,p,lotId,0,p.costo_promedio,p.costo_estimado,{tipo:'CORRECCION_VENCIMIENTO',user:req.user,
+            observacion:`Vencimiento anterior: ${lot.fecha||'Sin fecha'}; nuevo: ${date||'Sin fecha'}. Motivo: ${reason}`});
+        // Reemplazar únicamente avisos de vencimiento; conservar avisos de stock.
+        await S.query(c,'DELETE FROM Notificaciones WHERE id_fecha_vencimiento=? AND existencias IS NULL',[lotId]);
+        if(date && Number(lot.inventario)>0 && p.fecha_notificacion!=null) {
+            const [days]=await S.query(c,'SELECT DATEDIFF(?,?) dias',[date,S.today()]);
+            if(Number(days.dias)<=Number(p.fecha_notificacion)) {
+                const message=days.dias<0?`El producto ${p.nombre_producto} tiene un lote vencido.`:
+                    days.dias===0?`El producto ${p.nombre_producto} vence hoy.`:
+                    `El producto ${p.nombre_producto} está por vencerse en ${days.dias} días.`;
+                await S.query(c,`INSERT INTO Notificaciones
+                    (contenido,estado,id_usuario,id_producto,id_fecha_vencimiento,fecha_vencimiento,fecha_noti,existencias)
+                    SELECT ?,1,id_usuario,?,?,?,?,NULL FROM usuarios WHERE activo=1`,[message,productId,lotId,date,S.today()]);
+            }
+        }
+    });
+    res.json({ok:true});
+}));
 router.get('/inventario/kardex/:id',isLoggedIn,safe(async(req,res)=>{
     const [product]=await q('SELECT id_producto,nombre_producto FROM Productos WHERE id_producto=?',[req.params.id]);
     if(!product) return res.status(404).send('Producto no encontrado.');

@@ -1,0 +1,17 @@
+<div class="container-xl py-4" id="lotsPage" data-product="{{product.id_producto}}">
+    <div class="d-flex flex-wrap gap-2 mb-3"><a class="btn btn-outline-secondary" href="/inventario">Volver al inventario</a><a class="btn btn-outline-primary" href="/inventario/kardex/{{product.id_producto}}">Kardex</a></div>
+    <h2>Lotes · {{product.nombre_producto}}</h2>
+    <p>Corrija la fecha de vencimiento sin modificar las existencias. El lote conserva su identificador y sus operaciones asociadas. La fecha corregida determina el orden de salida en las próximas ventas.</p>
+    <div id="gestionError" class="alert alert-danger" hidden></div><div id="lotsSuccess" class="alert alert-success" role="status" hidden></div>
+    <div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Lote</th><th>Stock base</th><th>Vencimiento actual</th><th></th></tr></thead><tbody id="lotsRows"></tbody></table></div>
+    <section id="lotEditor" class="card card-body mb-4" hidden>
+        <h4 id="lotEditorTitle">Corregir vencimiento</h4>
+        <form id="lotDateForm" class="row g-3">
+            <div class="col-md-5"><label for="lotDate" class="form-label">Fecha nueva</label><input type="date" id="lotDate" name="fecha" class="form-control"><div class="form-text">Deje vacío para indicar que no tiene fecha de vencimiento.</div></div>
+            <div class="col-md-7"><label for="lotReason" class="form-label">Motivo de la corrección</label><textarea id="lotReason" name="motivo" class="form-control" maxlength="350" required rows="2"></textarea></div>
+            <div class="col-12 d-flex gap-2"><button type="submit" class="btn btn-primary">Guardar corrección</button><button type="button" id="cancelLotEdit" class="btn btn-outline-secondary">Cancelar</button></div>
+        </form>
+    </section>
+    <section class="card card-body"><h4>Últimas 100 correcciones de vencimiento</h4><div class="table-responsive"><table class="table"><thead><tr><th>Fecha / lote</th><th>Responsable</th><th>Corrección / motivo</th></tr></thead><tbody id="lotHistory"></tbody></table></div></section>
+</div>
+<script src="/js/gestion-ui.js"></script><script src="/js/lotes.js"></script>
