@@ -1,0 +1,24 @@
+<style>.metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}.metric{background:#f4f7fa;border:1px solid #dbe2e9;border-radius:12px;padding:18px}.metric strong{display:block;font-size:1.65rem}.report-bars{display:grid;gap:8px}.report-track{height:12px;background:#e8eef4;border-radius:6px;overflow:hidden}.report-bar{background:#287b8e;height:100%}.report-scroll{max-height:420px;overflow:auto}@media print{header,nav,footer,form,.no-print{display:none!important}.report-scroll{max-height:none;overflow:visible}}</style>
+<div class="container-xl py-4"><div class="d-flex justify-content-between flex-wrap gap-2"><div><h2>Control de la tienda</h2><p>Ventas, compras y mercadería disponible</p></div><div class="no-print d-flex flex-wrap gap-2 align-items-start"><a href="/reportes/inventario.csv" class="btn btn-outline-primary">Exportar inventario CSV</a><button class="btn btn-outline-secondary" id="printReports">Imprimir</button></div></div>
+<div id="gestionError" class="alert alert-danger" hidden></div>
+<form id="reportFilters" class="card card-body shadow-sm border-0 mb-4">
+    <div class="row g-3 align-items-end">
+        <div class="col-md-6 col-xl-4"><label for="reportFrom" class="form-label">Desde</label><input id="reportFrom" name="desde" type="date" class="form-control"></div>
+        <div class="col-md-6 col-xl-4"><label for="reportUntil" class="form-label">Hasta</label><input id="reportUntil" name="hasta" type="date" class="form-control"></div>
+        <div class="col-12 col-xl-4 d-flex flex-wrap gap-2">
+            <button type="submit" class="btn btn-primary">Aplicar</button>
+            <button type="button" id="currentMonth" class="btn btn-outline-secondary">Este mes</button>
+            <button type="button" id="previousMonth" class="btn btn-outline-secondary">Mes anterior</button>
+        </div>
+    </div>
+</form>
+<div id="reportMetrics" class="metric-grid mb-4"></div><p id="profitNote" class="small text-muted"></p>
+<div class="row g-3"><section class="col-lg-6"><div class="card card-body h-100"><h4>Ventas diarias</h4><div id="dailyBars" class="report-bars report-scroll"></div></div></section>
+<section class="col-lg-6"><div class="card card-body h-100"><div class="d-flex justify-content-between"><h4>Productos más vendidos</h4><select id="rankingOrder" class="form-select w-auto"><option value="importe">Por importe</option><option value="cantidad_base">Por cantidad base</option></select></div><p class="small text-muted">Las cantidades históricas sin equivalencia guardada usan la presentación actual. Compare cantidades entre productos con unidades base compatibles.</p><div id="rankingBars" class="report-bars report-scroll"></div></div></section></div>
+<section class="card card-body mt-4"><h4>Capital en mercadería · estado actual</h4><p id="capitalNote"></p><div class="metric-grid mb-3" id="capitalMetrics"></div>
+<label class="form-label">Filtrar productos<input id="capitalFilter" class="form-control" placeholder="Nombre del producto"></label>
+<div class="table-responsive report-scroll"><table class="table table-hover"><thead><tr><th>Producto</th><th>Stock base</th><th>Costo base</th><th>Valor</th><th>Estado</th><th></th></tr></thead><tbody id="capitalRows"></tbody></table></div></section>
+<div class="row g-3 mt-1"><section class="col-lg-6"><div class="card card-body"><h4>Clientes del periodo</h4><div id="clientReport"></div></div></section><section class="col-lg-6"><div class="card card-body"><h4>Proveedores del periodo</h4><div id="providerReport"></div></div></section></div>
+<div class="row g-3 mt-1"><section class="col-lg-6"><div class="card card-body"><h4>Reposición · estado actual</h4><div class="report-scroll" id="reorderReport"></div></div></section><section class="col-lg-6"><div class="card card-body"><h4>Vencidos / vencen en 30 días</h4><div class="report-scroll" id="expiryReport"></div></div></section></div>
+<section class="card card-body mt-3"><h4>Ajustes del periodo</h4><div id="adjustmentsReport"></div></section></div>
+<script src="/js/gestion-ui.js"></script><script src="/js/reportes.js"></script>

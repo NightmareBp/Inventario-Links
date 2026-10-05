@@ -14,7 +14,7 @@
                         <th scope="col">Nombre</th>
                         <th scope="col">Usuario</th>
                         <th scope="col">Cargo</th>
-                        <th scope="col">Eliminar</th>
+                        <th scope="col">Desactivar</th>
                     </tr>
                 </thead>
                 {{#each usuarios}}
@@ -28,16 +28,16 @@
                     <td>Vendedor</td>
                     {{/ifvalue}}
                     <td><button type="button" class="btn btn-outline-danger" data-bs-toggle="modal"
-                            data-bs-target="#ModalEliminar{{id_usuario}}">
-                            Eliminar
+                            data-bs-target="#ModalDesactivar{{id_usuario}}">
+                            Desactivar
                         </button>
                     </td>
-                    <div class="modal fade" id="ModalEliminar{{id_usuario}}" aria-labelledby="exampleModalLabel"
+                    <div class="modal fade" id="ModalDesactivar{{id_usuario}}" aria-labelledby="exampleModalLabel"
                         aria-hidden="true">
                         <div class="modal-dialog">
                             <div class="modal-content">
                                 <div class="modal-header">
-                                    <h1 class="modal-title fs-5" id="exampleModalLabel">Eliminar
+                                    <h1 class="modal-title fs-5" id="exampleModalLabel">Desactivar
                                         Usuario
                                     </h1>
                                     <button type="button" class="btn-close" data-bs-dismiss="modal"
@@ -48,8 +48,7 @@
                                 </div>
                                 <div class="modal-footer">
                                     <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Atrás</button>
-                                    <a class="btn btn-outline-danger"
-                                        href="/eliminarusuario/{{id_usuario}}">Continuar</a>
+                                    <form action="/eliminarusuario/{{id_usuario}}" method="post"><button class="btn btn-outline-danger" type="submit">Desactivar</button></form>
                                 </div>
                             </div>
                         </div>

@@ -1610,7 +1610,7 @@ document.addEventListener(
 
 
 
-                            const accion =
+                            const accionEdicion =
                                 esAdmin
 
                                     ?
@@ -1651,6 +1651,8 @@ document.addEventListener(
                                             Solo lectura
                                         </span>
                                     `;
+ const accion = `<div class="d-grid gap-1">${accionEdicion}<a class="btn btn-sm btn-outline-secondary" href="/inventario/kardex/${Number(producto.id_producto)}">Kardex</a></div>`;
+
 
 
 

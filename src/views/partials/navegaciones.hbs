@@ -11,7 +11,7 @@
 
             <a
                 class="navbar-brand"
-                href="/"
+                href="/inventario"
             >
 
                 <img
@@ -64,6 +64,8 @@
                         ================================================== -->
 
                         {{#ifvalue user.tipo value=1}}
+                            <li class="nav-item"><a class="nav-link" href="/reportes"><i class="fas fa-chart-line me-2"></i>Dashboard y capital</a></li>
+
 
 
                             <!-- =============================================
@@ -195,6 +197,8 @@
 
                                     </li>
 
+
+                            <li class="nav-item"><a class="dropdown-item" href="/inventario/ajustes"><i class="fas fa-exchange-alt me-2"></i>Ajustes de inventario</a></li>
                                 </ul>
 
                             </li>
@@ -308,6 +312,11 @@
                                     </li>
 
 
+
+                            <li class="nav-item"><a class="dropdown-item" href="/clientes"><i class="fas fa-user-friends me-2"></i>Clientes</a></li>
+
+                            <li class="nav-item"><a class="dropdown-item" href="/proveedores"><i class="fas fa-truck me-2"></i>Proveedores</a></li>
+                                    <li><hr class="dropdown-divider"></li>
                                     <!-- USUARIOS -->
 
                                     <li>
@@ -403,6 +412,8 @@
                         ================================================== -->
 
                         {{#ifvalue user.tipo value=2}}
+                            <li class="nav-item"><a class="nav-link" href="/clientes"><i class="fas fa-user-friends me-2"></i>Clientes</a></li>
+
 
 
                             <!-- =============================================

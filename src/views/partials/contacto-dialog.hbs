@@ -1,0 +1,13 @@
+<dialog id="contactDialog" style="border:0;border-radius:12px;max-width:600px;width:95%;box-shadow:0 10px 60px #0005;">
+<form id="contactForm"><h4 id="contactTitle">Registrar contacto</h4>
+<div id="contactError" class="alert alert-danger" hidden></div>
+<label class="form-label w-100">Nombre / razón social<input class="form-control" name="nombre" maxlength="150" required></label>
+<div class="row"><label class="col-sm-4 form-label">Tipo de documento<select name="tipo_documento" class="form-select"><option value="">Sin documento</option><option>DNI</option><option>RUC</option><option>CE</option><option>OTRO</option></select></label>
+<label class="col-sm-8 form-label">Documento<input class="form-control" name="documento" maxlength="25"></label></div>
+<label class="form-label w-100">Teléfono<input class="form-control" name="telefono" maxlength="30"></label>
+<label class="form-label w-100">Dirección<input class="form-control" name="direccion" maxlength="250"></label>
+<label class="form-label w-100">Correo<input class="form-control" name="correo" type="email" maxlength="150"></label>
+<label class="form-label w-100">Persona de contacto<input class="form-control" name="contacto" maxlength="150"></label>
+<label id="activeLabel" class="form-label" hidden><input name="activo" type="checkbox" checked> Activo</label>
+<div class="d-flex justify-content-end gap-2"><button type="button" id="closeContact" class="btn btn-secondary">Cancelar</button><button class="btn btn-primary" type="submit">Guardar</button></div>
+</form></dialog>

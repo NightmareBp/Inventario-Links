@@ -1,0 +1,15 @@
+<div class="container-xl py-4"><h2>Ajustes de inventario</h2><p>Solo gerente. Cada entrada o salida conserva el responsable y el motivo. Las salidas automáticas consumen primero los lotes que vencen antes.</p>
+<div id="gestionError" class="alert alert-danger" hidden></div><div id="ajusteSuccess" class="alert alert-success" hidden></div>
+<form id="adjustmentForm" class="card card-body" data-token="{{token}}">
+<div class="row g-3"><label class="col-md-3">Tipo<select class="form-select" id="adjustmentType"><option value="SALIDA">Salida</option><option value="ENTRADA">Entrada</option></select></label>
+<label class="col-md-3">Motivo<select class="form-select" id="adjustmentReason"><option>Rotura</option><option>Vencimiento</option><option>Pérdida</option><option>Consumo interno</option><option>Sobrante</option><option>Ingreso inicial</option><option>Otro</option></select></label>
+<label class="col-md-6">Observación<input class="form-control" id="adjustmentNote" maxlength="500" required placeholder="Explique el motivo del ajuste"></label></div>
+<div class="my-3 position-relative"><label class="form-label w-100">Añadir producto (nombre o código)<input id="adjustmentSearch" class="form-control" autocomplete="off"></label><div id="adjustmentSuggestions" class="list-group"></div></div>
+<div id="adjustmentLines"></div><p class="small text-muted">En entradas, el costo se expresa por unidad base. Vacío utiliza el costo promedio existente; si no existe, quedará pendiente de valoración.</p>
+<button class="btn btn-success align-self-end" id="saveAdjustment">Registrar ajuste</button></form>
+<section class="card card-body mt-4"><h4>Historial de ajustes</h4>
+<form id="adjustmentFilters" class="row g-2 mb-3"><label class="col-md-4">Desde<input class="form-control" type="date" name="desde"></label><label class="col-md-4">Hasta<input class="form-control" type="date" name="hasta"></label><div class="col-md-4 align-self-end"><button class="btn btn-primary">Filtrar</button></div></form>
+<div class="table-responsive"><table class="table"><thead><tr><th>N.º / fecha</th><th>Tipo / motivo</th><th>Observación</th><th>Responsable</th><th>Acciones</th></tr></thead><tbody id="adjustmentHistory"></tbody></table></div>
+<div><button id="prevAdjustments" class="btn btn-outline-secondary">Anterior</button><span id="adjustmentPage" class="mx-2"></span><button id="nextAdjustments" class="btn btn-outline-secondary">Siguiente</button></div></section>
+<dialog id="adjustmentDetails" style="max-width:900px;width:95%;border:1px solid #ddd;border-radius:10px;"><h4>Detalle del ajuste</h4><div id="adjustmentDetailsContent"></div><button id="closeAdjustmentDetails" class="btn btn-secondary">Cerrar</button></dialog></div>
+<script src="/js/gestion-ui.js"></script><script src="/js/ajustes.js"></script>

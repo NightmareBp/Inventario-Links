@@ -121,6 +121,7 @@
 
                 </div>
 
+<div class="col-md-4"><label class="form-label">Registrado por</label><select class="form-select" name="usuario"><option value="">Todos los usuarios</option>{{#each usuarios}}<option value="{{id_usuario}}" {{#if selected}}selected{{/if}}>{{nombre}}</option>{{/each}}</select></div>
             </form>
 
         </div>
@@ -181,6 +182,7 @@
                             Hora
                         </th>
 
+                        <th>Cliente</th><th>Registrado por</th>
                         <th class="text-end">
                             Total
                         </th>
@@ -212,6 +214,7 @@
                                 {{hora_mostrar}}
                             </td>
 
+                            <td>{{#if contacto_nombre}}{{contacto_nombre}}{{else}}Sin registrar{{/if}}</td><td>{{#if usuario_nombre}}{{usuario_nombre}}{{else}}No registrado{{/if}}</td>
                             <td class="text-end fw-semibold">
                                 S/. {{monto_total}}
                             </td>

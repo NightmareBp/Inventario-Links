@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "dev": "nodemon src/index.js",
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "test:syntax": "node test/syntax.js",
+    "test:integration": "node test/integration.js"
   },
   "keywords": [],
   "author": "",
@@ -14,6 +16,7 @@
     "bcryptjs": "^2.4.3",
     "body-parser": "^1.20.2",
     "connect-flash": "^0.1.1",
+    "decimal.js": "^10.6.0",
     "express": "^4.18.2",
     "express-handlebars": "^7.0.7",
     "express-mysql-session": "^3.0.0",

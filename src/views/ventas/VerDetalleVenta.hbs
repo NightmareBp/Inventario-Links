@@ -38,7 +38,9 @@
         </div>
 
 
-        <div class="card-body p-0">
+        <div class="p-3 border-bottom"><strong>Cliente:</strong> {{#if venta.contacto_nombre}}{{venta.contacto_nombre}} {{venta.contacto_documento}}{{else}}Sin registrar{{/if}}<br>
+<strong>Registrado por:</strong> {{#if venta.usuario_nombre}}{{venta.usuario_nombre}}{{else}}No registrado (operación antigua){{/if}}</div>
+<div class="card-body p-0">
 
             <div class="table-responsive">
 

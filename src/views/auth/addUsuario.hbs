@@ -27,8 +27,11 @@
                                 required>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Contraseña</label>
-                            <input type="password" name="contra" placeholder="Contraseña" class="form-control" required>
+                            <label for="accountPassword" class="form-label">Contraseña</label>
+                            <div class="input-group">
+                                <input id="accountPassword" type="password" name="contra" aria-label="Contraseña" placeholder="Contraseña" class="form-control" autocomplete="new-password" required>
+                                <button type="button" class="btn btn-outline-secondary" data-password-toggle="accountPassword" aria-controls="accountPassword" aria-label="Mostrar contraseña" aria-pressed="false">Mostrar</button>
+                            </div>
                         </div>
                         <div class="d-grid gap-2 mb-3">
                             <button class="btn btn-success">Registrar</button>
@@ -39,3 +42,4 @@
         </div>
     </div>
 </div>
+<script src="/js/password-toggle.js" defer></script>

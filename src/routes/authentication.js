@@ -15,7 +15,11 @@ router.get('/signup', isNotLoggedIn, async (req, res) => {
     res.render('auth/signup');
 });
 
-router.post('/signup', isNotLoggedIn, passport.authenticate('local.signup', {
+router.post('/signup', isNotLoggedIn, async (req,res,next) => {
+ const rows=await pool.query('SELECT id_usuario FROM usuarios WHERE tipo=1 LIMIT 1');
+ if(rows.length) return res.status(403).send('El registro inicial ya está cerrado.');
+ req.body.tipo=1; next();
+}, passport.authenticate('local.signup', {
     successRedirect: '/',
     failureRedirect: '/signup', // Corregir el nombre de la opción
     failureFlash: true
@@ -76,7 +80,7 @@ router.post('/signin', isNotLoggedIn, (req, res, next) => {
 
 router.get('/asignarUsuario', isLoggedInAdmin, async (req, res) => {
     const userId = req.user.id_usuario;
-    const usuarios = await pool.query('SELECT * from usuarios where id_usuario <> ? ORDER BY nombre ASC;', [userId]);
+    const usuarios = await pool.query('SELECT * from usuarios where activo=1 AND id_usuario <> ? ORDER BY nombre ASC;', [userId]);
     res.render('auth/asignarUsuario', { usuarios });
 });
 
@@ -112,11 +116,12 @@ router.post('/usuario/add', isLoggedInAdmin, async (req, res) => {
     res.redirect('/asignarUsuario');
 });
 
-router.get('/eliminarusuario/:id', isLoggedInAdmin, async (req, res) => {
+router.post('/eliminarusuario/:id', isLoggedInAdmin, async (req, res) => {
     const { id } = req.params;
+    if(Number(id)===Number(req.user.id_usuario)) { req.flash('message','No puede desactivar su propia cuenta.'); return res.redirect('/asignarUsuario'); }
+    await pool.query('UPDATE usuarios SET activo=0 WHERE id_usuario = ?', [id]);
     await pool.query('DELETE FROM Notificaciones WHERE id_usuario = ?', [id]);
-    await pool.query('DELETE FROM usuarios WHERE id_usuario = ?', [id]);
-    req.flash('noti', 'Usuario Eliminado Correctamente');
+    req.flash('noti', 'Usuario desactivado; su historial se conserva');
     res.redirect('/asignarUsuario');
 });
 

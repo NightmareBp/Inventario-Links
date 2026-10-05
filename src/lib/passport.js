@@ -11,7 +11,7 @@ passport.use('local.signin', new LocalStrategy({
     try {
 
         const rows = await pool.query(
-            'SELECT * FROM usuarios WHERE usuario = ?',
+            'SELECT * FROM usuarios WHERE usuario = ? AND activo=1',
             [usuario]
         );
 
@@ -70,7 +70,7 @@ passport.use('local.signup', new LocalStrategy({
 
     newUser.contra = await helpers.encryptPassword(newUser.contra);
     const result = await pool.query('INSERT INTO usuarios SET ?', [newUser]);
-    newUser.id = result.insertId;
+    newUser.id_usuario = result.insertId;
     return done(null, newUser);
 }));
 
@@ -83,7 +83,7 @@ passport.deserializeUser(async (id, done) => {
     try {
 
         const rows = await pool.query(
-            'SELECT * FROM usuarios WHERE id_usuario = ?',
+            'SELECT * FROM usuarios WHERE id_usuario = ? AND activo=1',
             [id]
         );
 

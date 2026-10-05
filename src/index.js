@@ -60,10 +60,17 @@ app.use(helmet.hidePoweredBy());
 //Variables globales
 app.use((req, res, next) => {
 
-    res.locals.success = req.flash('success');
-    res.locals.message = req.flash('message');
-    res.locals.noti = req.flash('noti');
     res.locals.user = req.user || null;
+
+    // Consumir las alertas solo cuando se muestra una vista. Las redirecciones
+    // y las solicitudes de archivos/API deben conservarlas en la sesión.
+    const render = res.render;
+    res.render = function (view, options, callback) {
+        this.locals.success = req.flash('success');
+        this.locals.message = req.flash('message');
+        this.locals.noti = req.flash('noti');
+        return render.call(this, view, options, callback);
+    };
 
     next();
 
@@ -72,6 +79,8 @@ app.use((req, res, next) => {
 //Rutas
 app.use(require('./routes/index.js'));
 app.use(require('./routes/authentication.js'));
+app.use(require('./routes/gestion.js'));
+app.use('/reportes', require('./routes/reportes.js'));
 app.use('/inventario', require('./routes/inventario.js'));
 app.use('/notificaciones', require('./routes/notificaciones.js'));
 app.use('/ventas', require('./routes/ventas.js'));

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const pool = require('../database');
+const stock = require('../lib/stock');
 
 const {
     isLoggedIn,
@@ -253,7 +254,7 @@ async function verificarFechas() {
                     ON p.id_producto =
                        fv.id_producto
 
-                WHERE
+                WHERE fv.inventario > 0 AND
                     fv.fecha_vencimiento
                         IS NOT NULL
 
@@ -1077,7 +1078,7 @@ async function obtenerInventarioPaginado({
 
             WHERE
                 id_producto
-                IN (?)
+                IN (?) AND inventario > 0
 
             ORDER BY
 
@@ -1891,8 +1892,9 @@ router.post(
 
 
 
+            await stock.transaction(async connection => {
             const resultadoProducto =
-                await pool.query(
+                await stock.query(connection,
                     `
                         INSERT INTO Productos
                         SET ?
@@ -1928,7 +1930,7 @@ router.post(
                 i++
             ) {
 
-                await pool.query(
+                await stock.query(connection,
                     `
                         INSERT INTO Precios_productos
                         SET ?
@@ -1960,33 +1962,17 @@ router.post(
                INVENTARIO INICIAL
             ================================================= */
 
-            for (
-                let i = 0;
-                i < cantidadesIniciales.length;
-                i++
-            ) {
-
-                await pool.query(
-                    `
-                        INSERT INTO Fechas_vencimiento
-                        SET ?
-                    `,
-                    {
-                        fecha_vencimiento:
-                            fechasVencimiento[i] ||
-                            null,
-
-                        inventario:
-                            cantidadesIniciales[i],
-
-                        id_producto:
-                            idProducto
-                    }
-                );
-
+            const preciosBase = await stock.query(connection, `SELECT pp.precio_compra/u.cantidad costo FROM Precios_productos pp JOIN Unidades u ON u.id_unidad=pp.id_unidad WHERE pp.id_producto=? AND pp.precio_compra>0 AND u.cantidad>0`,[idProducto]);
+            const valores = [...new Set(preciosBase.map(row=>stock.cost(row.costo)))];
+            const costoInicial = valores.length===1 ? valores[0] : null;
+            const [productoNuevo] = await stock.query(connection,'SELECT * FROM Productos WHERE id_producto=?',[idProducto]);
+            productoNuevo.stock=stock.D(0); productoNuevo.costo_promedio=costoInicial; productoNuevo.costo_estimado=1;
+            for(let i=0;i<cantidadesIniciales.length;i++) {
+                if(cantidadesIniciales[i]>0) await stock.enter(connection,productoNuevo,cantidadesIniciales[i],costoInicial,stock.validDate(fechasVencimiento[i]),
+                    {tipo:'CREACION',user:req.user,observacion:'Inventario inicial al crear el producto'},1);
             }
-
-
+            await stock.updateState(connection,productoNuevo);
+            });
 
             req.flash(
                 'success',
@@ -3005,527 +2991,28 @@ router.get(
    EDITAR INVENTARIO
 ========================================================= */
 
-router.post(
-    '/editarinventarios/:id',
-    isLoggedInAdmin,
-    async (req, res) => {
-
-        try {
-
-            const {
-                id
-            } = req.params;
-
-
-
-            const resultado =
-                await pool.query(`
-                    SELECT *
-                    FROM Fechas_vencimiento
-
-                    WHERE
-                        id_fechavencimiento = ?
-
-                    LIMIT 1
-                `, [
-                    id
-                ]);
-
-
-            if (
-                resultado.length === 0
-            ) {
-
-                req.flash(
-                    'message',
-                    'El registro de inventario no existe.'
-                );
-
-
-                return res.redirect(
-                    '/inventario'
-                );
-
-            }
-
-
-
-            const inventario =
-                Number(
-                    req.body.inventario || 0
-                );
-
-
-            const fechaVencimiento =
-                String(
-                    req.body.fechavencimiento || ''
-                ).trim() || null;
-
-
-
-            if (
-                !Number.isFinite(
-                    inventario
-                ) ||
-
-                inventario < 0
-            ) {
-
-                req.flash(
-                    'message',
-                    'Ingrese un inventario válido mayor o igual que cero.'
-                );
-
-
-                return res.redirect(
-                    `/inventario/edit/${resultado[0].id_producto}`
-                );
-
-            }
-
-
-
-            let fechaExistente;
-
-
-            if (fechaVencimiento) {
-
-                fechaExistente =
-                    await pool.query(`
-                        SELECT
-                            id_fechavencimiento
-
-                        FROM Fechas_vencimiento
-
-                        WHERE
-                            id_producto = ?
-
-                            AND
-                            fecha_vencimiento = ?
-
-                            AND
-                            id_fechavencimiento <> ?
-
-                        LIMIT 1
-                    `, [
-                        resultado[0].id_producto,
-                        fechaVencimiento,
-                        id
-                    ]);
-
-            }
-
-            else {
-
-                fechaExistente =
-                    await pool.query(`
-                        SELECT
-                            id_fechavencimiento
-
-                        FROM Fechas_vencimiento
-
-                        WHERE
-                            id_producto = ?
-
-                            AND
-                            fecha_vencimiento
-                                IS NULL
-
-                            AND
-                            id_fechavencimiento <> ?
-
-                        LIMIT 1
-                    `, [
-                        resultado[0].id_producto,
-                        id
-                    ]);
-
-            }
-
-
-
-            if (
-                fechaExistente.length > 0
-            ) {
-
-                req.flash(
-                    'message',
-                    'Ya existe esta fecha de vencimiento en el producto.'
-                );
-
-
-                return res.redirect(
-                    `/inventario/edit/${resultado[0].id_producto}`
-                );
-
-            }
-
-
-
-            await pool.query(
-                `
-                    UPDATE Fechas_vencimiento
-
-                    SET ?
-
-                    WHERE
-                        id_fechavencimiento = ?
-                `,
-                [
-                    {
-                        fecha_vencimiento:
-                            fechaVencimiento,
-
-                        inventario
-                    },
-
-                    id
-                ]
-            );
-
-
-
-            await actualizarEstadoProducto(
-                resultado[0].id_producto
-            );
-
-
-
-            req.flash(
-                'success',
-                'Inventario actualizado correctamente.'
-            );
-
-
-            return res.redirect(
-                `/inventario/edit/${resultado[0].id_producto}`
-            );
-
-
-        } catch (error) {
-
-            console.error(
-                'Error editando inventario:',
-                error
-            );
-
-
-            req.flash(
-                'message',
-                'No se pudo actualizar el inventario.'
-            );
-
-
-            return res.redirect(
-                '/inventario'
-            );
-
-        }
-
-    }
-);
-
-
+router.all('/editarinventarios/:id', isLoggedInAdmin, (req,res) => {
+    req.flash('message','Las existencias se modifican mediante ajustes con trazabilidad.');
+    return res.redirect('/inventario/ajustes');
+});
 
 /* =========================================================
    AÑADIR INVENTARIO
 ========================================================= */
 
-router.post(
-    '/anadirinventarios/:id',
-    isLoggedInAdmin,
-    async (req, res) => {
-
-        try {
-
-            const {
-                id
-            } = req.params;
-
-
-            const inventario =
-                Number(
-                    req.body.inventario || 0
-                );
-
-
-            const fechaVencimiento =
-                String(
-                    req.body.fechavencimiento || ''
-                ).trim() || null;
-
-
-
-            if (
-                !Number.isFinite(
-                    inventario
-                ) ||
-
-                inventario < 0
-            ) {
-
-                req.flash(
-                    'message',
-                    'Ingrese un inventario válido mayor o igual que cero.'
-                );
-
-
-                return res.redirect(
-                    `/inventario/edit/${id}`
-                );
-
-            }
-
-
-
-            let fechaExistente;
-
-
-            if (fechaVencimiento) {
-
-                fechaExistente =
-                    await pool.query(`
-                        SELECT
-                            id_fechavencimiento
-
-                        FROM Fechas_vencimiento
-
-                        WHERE
-                            id_producto = ?
-
-                            AND
-                            fecha_vencimiento = ?
-
-                        LIMIT 1
-                    `, [
-                        id,
-                        fechaVencimiento
-                    ]);
-
-            }
-
-            else {
-
-                fechaExistente =
-                    await pool.query(`
-                        SELECT
-                            id_fechavencimiento
-
-                        FROM Fechas_vencimiento
-
-                        WHERE
-                            id_producto = ?
-
-                            AND
-                            fecha_vencimiento
-                                IS NULL
-
-                        LIMIT 1
-                    `, [
-                        id
-                    ]);
-
-            }
-
-
-
-            if (
-                fechaExistente.length > 0
-            ) {
-
-                req.flash(
-                    'message',
-                    'Ya existe esta fecha de vencimiento en el producto.'
-                );
-
-
-                return res.redirect(
-                    `/inventario/edit/${id}`
-                );
-
-            }
-
-
-
-            await pool.query(
-                `
-                    INSERT INTO Fechas_vencimiento
-                    SET ?
-                `,
-                {
-                    fecha_vencimiento:
-                        fechaVencimiento,
-
-                    inventario,
-
-                    id_producto:
-                        id
-                }
-            );
-
-
-
-            await actualizarEstadoProducto(
-                id
-            );
-
-
-
-            req.flash(
-                'success',
-                'Inventario agregado correctamente.'
-            );
-
-
-            return res.redirect(
-                `/inventario/edit/${id}`
-            );
-
-
-        } catch (error) {
-
-            console.error(
-                'Error agregando inventario:',
-                error
-            );
-
-
-            req.flash(
-                'message',
-                'No se pudo agregar el inventario.'
-            );
-
-
-            return res.redirect(
-                `/inventario/edit/${req.params.id}`
-            );
-
-        }
-
-    }
-);
-
-
+router.all('/anadirinventarios/:id', isLoggedInAdmin, (req,res) => {
+    req.flash('message','Las existencias se modifican mediante ajustes con trazabilidad.');
+    return res.redirect('/inventario/ajustes');
+});
 
 /* =========================================================
    ELIMINAR INVENTARIO
 ========================================================= */
 
-router.get(
-    '/eliminarinventario/:id',
-    isLoggedInAdmin,
-    async (req, res) => {
-
-        try {
-
-            const {
-                id
-            } = req.params;
-
-
-
-            const resultado =
-                await pool.query(`
-                    SELECT
-                        id_producto
-
-                    FROM Fechas_vencimiento
-
-                    WHERE
-                        id_fechavencimiento = ?
-
-                    LIMIT 1
-                `, [
-                    id
-                ]);
-
-
-            if (
-                resultado.length === 0
-            ) {
-
-                req.flash(
-                    'message',
-                    'El registro de inventario no existe.'
-                );
-
-
-                return res.redirect(
-                    '/inventario'
-                );
-
-            }
-
-
-
-            const idProducto =
-                resultado[0].id_producto;
-
-
-
-            await pool.query(`
-                DELETE FROM Notificaciones
-
-                WHERE
-                    id_fecha_vencimiento = ?
-            `, [
-                id
-            ]);
-
-
-
-            await pool.query(`
-                DELETE FROM Fechas_vencimiento
-
-                WHERE
-                    id_fechavencimiento = ?
-            `, [
-                id
-            ]);
-
-
-
-            await actualizarEstadoProducto(
-                idProducto
-            );
-
-
-
-            req.flash(
-                'noti',
-                'Inventario eliminado correctamente.'
-            );
-
-
-            return res.redirect(
-                `/inventario/edit/${idProducto}`
-            );
-
-
-        } catch (error) {
-
-            console.error(
-                'Error eliminando inventario:',
-                error
-            );
-
-
-            req.flash(
-                'message',
-                'No se pudo eliminar el inventario.'
-            );
-
-
-            return res.redirect(
-                '/inventario'
-            );
-
-        }
-
-    }
-);
-
-
+router.all('/eliminarinventario/:id', isLoggedInAdmin, (req,res) => {
+    req.flash('message','Las existencias se modifican mediante ajustes con trazabilidad.');
+    return res.redirect('/inventario/ajustes');
+});
 
 /* =========================================================
    UNIDADES
@@ -3625,6 +3112,7 @@ router.post(
 
 
 
+            if(Number(cantidadTexto)<=0) {req.flash('message','La equivalencia debe ser positiva.');return res.redirect('/inventario/unidades');}
             const unidadExistente =
                 await pool.query(`
                     SELECT
@@ -3834,8 +3322,13 @@ router.post(
 
 
 
-            const unidadExistente =
-                await pool.query(`
+            const [unidadActual] = await pool.query('SELECT cantidad FROM Unidades WHERE id_unidad=?',[id]);
+            if(!unidadActual || Number(cantidadTexto)<=0) {req.flash('message','La equivalencia debe ser positiva.');return res.redirect('/inventario/unidades');}
+            if(Number(unidadActual.cantidad)!==Number(cantidadTexto)) {
+                const [usada] = await pool.query(`SELECT (EXISTS(SELECT 1 FROM Precios_productos WHERE id_unidad=?) OR EXISTS(SELECT 1 FROM Detalle_compra WHERE id_unidad=?) OR EXISTS(SELECT 1 FROM Detalle_venta WHERE id_unidad=?) OR EXISTS(SELECT 1 FROM Detalle_ajuste WHERE id_unidad=?)) usada`,[id,id,id,id]);
+                if(usada.usada) {req.flash('message','Esta unidad ya está asociada a productos. Cree otra unidad para cambiar la equivalencia.');return res.redirect('/inventario/unidades');}
+            }
+            const unidadExistente = await pool.query(`
                     SELECT
                         id_unidad
 

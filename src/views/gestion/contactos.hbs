@@ -1,0 +1,13 @@
+<div class="container-xl py-4" id="contactPage" data-base="{{path}}" data-admin="{{esAdmin}}">
+<div class="d-flex justify-content-between flex-wrap gap-2"><h2>{{title}}</h2><button id="createContact" class="btn btn-success">Nuevo registro</button></div>
+<div id="gestionError" class="alert alert-danger mt-3" hidden></div>
+<label class="form-label w-100 mt-3">Buscar por nombre o documento<input id="filterContacts" class="form-control" autocomplete="off"></label>
+<div class="table-responsive"><table class="table table-hover"><thead><tr><th>Nombre</th><th>Documento</th><th>Teléfono</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="contactsRows"></tbody></table></div>
+<div class="d-flex gap-2 align-items-center"><button id="prevContacts" class="btn btn-outline-secondary">Anterior</button><span id="contactPageInfo"></span><button id="nextContacts" class="btn btn-outline-secondary">Siguiente</button></div>
+<section id="historySection" class="card mt-4" hidden><div class="card-body"><h4 id="historyTitle"></h4>
+<form id="historyFilters" class="row g-2"><label class="col-sm-4">Desde<input class="form-control" type="date" name="desde"></label><label class="col-sm-4">Hasta<input class="form-control" type="date" name="hasta"></label><div class="col-sm-4 align-self-end"><button class="btn btn-primary">Filtrar</button><button class="btn btn-outline-secondary" type="button" id="lastMonth">Mes anterior</button></div></form>
+<p id="historyTotal" class="my-3 fw-bold"></p><div class="table-responsive"><table class="table"><thead><tr><th>Operación</th><th>Fecha</th><th>Total</th><th>Registrado por</th></tr></thead><tbody id="historyRows"></tbody></table></div>
+<button id="prevHistory" class="btn btn-outline-secondary">Anterior</button><span id="historyPageInfo" class="mx-2"></span><button id="nextHistory" class="btn btn-outline-secondary">Siguiente</button>
+</div></section></div>
+{{> contacto-dialog}}
+<script src="/js/gestion-ui.js"></script><script src="/js/contactos.js"></script>
